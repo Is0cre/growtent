@@ -1,25 +1,41 @@
-from __future__ import annotations
-import subprocess
-import shlex
-from pathlib import Path
-from datetime import datetime
-from .config import CAMERA_CMD, CAMERA_RES, CAPTURE_DIR
+import time, threading
+from io import BytesIO
 
-def capture_still(out_path: Path) -> Path:
-    """
-    Take a still image using rpicam-still or libcamera-still.
-    Saves to out_path (jpg). Returns the path.
-    """
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    if CAMERA_CMD.endswith("rpicam-still"):
-        cmd = f"{CAMERA_CMD} -o {shlex.quote(str(out_path))} -n -t 1 --width {CAMERA_RES.split(':')[0]} --height {CAMERA_RES.split(':')[1]}"
-    else:
-        # libcamera-still compatible
-        w, h = CAMERA_RES.split(":")
-        cmd = f"{CAMERA_CMD} -o {shlex.quote(str(out_path))} -n -t 1 --width {w} --height {h}"
-    subprocess.run(cmd, shell=True, check=False)
-    return out_path
+class _NoCam:
+    available = False
+    def capture_jpeg(self, size=(640,480), quality=75):
+        raise RuntimeError("Camera not available")
 
-def snapshot_path() -> Path:
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return CAPTURE_DIR / f"snapshot_{ts}.jpg"
+def _impl():
+    try:
+        from picamera2 import Picamera2
+        from PIL import Image
+        _lock = threading.Lock()
+        _picam = None
+        _started = False
+        class Camera:
+            available = True
+            def _ensure_started(self, size):
+                nonlocal _picam, _started
+                with _lock:
+                    if _picam is None:
+                        _picam = Picamera2()
+                        cfg = _picam.create_still_configuration(main={"size": size, "format": "RGB888"})
+                        _picam.configure(cfg)
+                    if not _started:
+                        _picam.start()
+                        time.sleep(0.3)
+            def capture_jpeg(self, size=(640,480), quality=75):
+                self._ensure_started(size)
+                frame = _picam.capture_array()
+                from PIL import Image
+                img = Image.fromarray(frame)
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                buf = BytesIO()
+                img.save(buf, format="JPEG", quality=quality, optimize=True)
+                return buf.getvalue()
+        return Camera
+    except Exception:
+        return _NoCam
+Camera = _impl()
