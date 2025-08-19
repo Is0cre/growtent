@@ -1,0 +1,11 @@
+body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #0f1116; color: #e6e6e6; }
+header { padding: 12px 16px; background:#1a1f2b; display:flex; justify-content:space-between; align-items:center; }
+a { color: #89b4fa; text-decoration: none; }
+main { padding: 16px; max-width: 900px; margin: auto; }
+section { background:#151925; padding:16px; border-radius:12px; margin:12px 0; }
+button { background:#2b7; border:0; padding:8px 14px; border-radius:8px; cursor:pointer; }
+.flash .msg { padding:8px; border-radius:6px; margin-bottom:6px; }
+.flash .msg.info { background:#20304b; }
+.flash .msg.success { background:#1f3b2f; }
+.on { color:#6cff9b; font-weight:700; }
+.off { color:#ff6d6d; font-weight:700; }
