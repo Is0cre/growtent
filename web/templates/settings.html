@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Settings – Grow Tent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Settings</h1>
+      <div class="spacer"></div>
+      <a class="btn" href="{{ url_for('index') }}">← Dashboard</a>
+    </header>
+
+    {% if saved %}<div class="notice success">✅ Config saved. Backup written to <code>config_backups/</code>.</div>{% endif %}
+    {% if restarted is not none %}
+      {% if restarted %}<div class="notice success">✅ Controller restarted.</div>
+      {% else %}<div class="notice warn">⚠️ Restart failed. Add sudoers or restart manually.</div>{% endif %}
+    {% endif %}
+    {% if errors and errors|length %}
+      <div class="notice error"><strong>Errors:</strong><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+    {% endif %}
+
+    <form method="post" class="form">
+      <fieldset>
+        <legend>Lights</legend>
+        <div class="grid-2">
+          <label class="field">
+            <span>Lights ON time</span>
+            <input type="text" name="LIGHTS_ON_TIME" value="{{ editable.LIGHTS_ON_TIME }}" placeholder="HH:MM">
+          </label>
+          <label class="field">
+            <span>Lights OFF time</span>
+            <input type="text" name="LIGHTS_OFF_TIME" value="{{ editable.LIGHTS_OFF_TIME }}" placeholder="HH:MM">
+          </label>
+        </div>
+        <label class="switch">
+          <input type="checkbox" name="ENABLE_LIGHTS" {% if editable.ENABLE_LIGHTS %}checked{% endif %}>
+          <span>Enable Lights</span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Thresholds</legend>
+        <div class="grid-3">
+          <label class="field">
+            <span>Exhaust ON temp (°C)</span>
+            <input type="number" step="0.1" name="TEMP_THRESHOLD_EXHAUST_ON" value="{{ editable.TEMP_THRESHOLD_EXHAUST_ON }}">
+          </label>
+          <label class="field">
+            <span>Heater ON temp (°C)</span>
+            <input type="number" step="0.1" name="TEMP_THRESHOLD_HEATER_ON" value="{{ editable.TEMP_THRESHOLD_HEATER_ON }}">
+          </label>
+          <label class="field">
+            <span>Humidity for circ fans ON (%)</span>
+            <input type="number" step="0.1" name="HUMIDITY_HIGH_FOR_FANS" value="{{ editable.HUMIDITY_HIGH_FOR_FANS }}">
+          </label>
+          <label class="field">
+            <span>Humidifier ON below (%)</span>
+            <input type="number" step="0.1" name="HUMIDITY_LOW_HUMIDIFIER" value="{{ editable.HUMIDITY_LOW_HUMIDIFIER }}">
+          </label>
+          <label class="field">
+            <span>Dehumidifier ON above (%)</span>
+            <input type="number" step="0.1" name="HUMIDITY_HIGH_DEHUMIDIFIER" value="{{ editable.HUMIDITY_HIGH_DEHUMIDIFIER }}">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Air‑out & Loop</legend>
+        <div class="grid-3">
+          <label class="field">
+            <span>Air‑out times (comma)</span>
+            <input type="text" name="AIR_OUT_TIMES" value="{{ editable.AIR_OUT_TIMES|join(', ') }}" placeholder="09:00, 15:00, 21:00">
+          </label>
+          <label class="field">
+            <span>Air‑out duration (s)</span>
+            <input type="number" name="AIR_OUT_DURATION" value="{{ editable.AIR_OUT_DURATION }}">
+          </label>
+          <label class="field">
+            <span>Control interval (s)</span>
+            <input type="number" name="CONTROL_INTERVAL" value="{{ editable.CONTROL_INTERVAL }}">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Devices</legend>
+        <div class="switches">
+          {% for key,label in {
+            'ENABLE_AIR_PUMP':'Enable Air Pump',
+            'ENABLE_NUTRIENT_PUMP':'Enable Nutrient Pump',
+            'ENABLE_CIRC_FAN1':'Enable Circulatory Fan 1',
+            'ENABLE_CIRC_FAN2':'Enable Circulatory Fan 2',
+            'ENABLE_EXHAUST_FAN':'Enable Exhaust Fan',
+            'ENABLE_HUMIDIFIER':'Enable Humidifier',
+            'ENABLE_HEATER':'Enable Heater',
+            'ENABLE_DEHUMIDIFIER':'Enable Dehumidifier'
+          }.items() %}
+            <label class="switch">
+              <input type="checkbox" name="{{ key }}" {% if editable[key] %}checked{% endif %}>
+              <span>{{ label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <div class="actions">
+        <button type="submit" class="btn">Save</button>
+        <label class="switch-inline">
+          <input type="checkbox" name="restart" value="1">
+          <span>Restart controller after save</span>
+        </label>
+      </div>
+    </form>
+
+    <section class="note">
+      <h3>Restart note</h3>
+      <p>To allow restart without password:</p>
+      <pre>sudo visudo -f /etc/sudoers.d/growtent-web
+matthias ALL=NOPASSWD: /bin/systemctl restart growtent.service</pre>
+      <p>Or restart manually:</p>
+      <pre>sudo systemctl restart growtent.service</pre>
+    </section>
+  </div>
+</body>
+</html>
