@@ -1,0 +1,14 @@
+[Unit]
+Description=Growtent Controller (GPIO + BME680)
+After=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=%h/growtent/controller
+Environment=GROWTENT_ROOT=%h/growtent
+ExecStart=%h/growtent/controller/.venv/bin/python -m controller.main
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
