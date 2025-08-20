@@ -17,3 +17,4 @@ Clone and explore:
 ```bash
 git clone git@github.com:Is0cre/growtent.git
 cd growtent
+./deploy.sh
