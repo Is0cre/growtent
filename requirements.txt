@@ -1,0 +1,33 @@
+# Grow Tent Automation Requirements
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.0
+
+# Hardware Control
+RPi.GPIO==0.7.1
+bme680==1.1.1
+smbus2==0.4.3
+picamera2==0.3.16
+
+# Telegram Bot
+python-telegram-bot==20.7
+
+# Database
+pyyaml==6.0.1
+
+# Image Processing
+Pillow==10.1.0
+numpy==1.26.2
+
+# Video Processing
+opencv-python==4.8.1.78
+
+# Optional: OpenAI for plant health analysis
+openai==1.3.7
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1

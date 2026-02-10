@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌱 Grow Tent Automation</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar" id="sidebar">
+        <div class="logo">
+            <i class="fas fa-seedling"></i>
+            <h2>Grow Tent</h2>
+        </div>
+        <nav>
+            <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                <i class="fas fa-gauge-high"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#projects" class="nav-link" data-page="projects">
+                <i class="fas fa-folder-tree"></i>
+                <span>Projects</span>
+            </a>
+            <a href="#data-logs" class="nav-link" data-page="data-logs">
+                <i class="fas fa-chart-line"></i>
+                <span>Data Logs</span>
+            </a>
+            <a href="#diary" class="nav-link" data-page="diary">
+                <i class="fas fa-book"></i>
+                <span>Grow Diary</span>
+            </a>
+            <a href="#settings" class="nav-link" data-page="settings">
+                <i class="fas fa-sliders"></i>
+                <span>Settings</span>
+            </a>
+            <a href="#timelapse" class="nav-link" data-page="timelapse">
+                <i class="fas fa-video"></i>
+                <span>Time-lapse</span>
+            </a>
+            <a href="#plant-health" class="nav-link" data-page="plant-health">
+                <i class="fas fa-heart-pulse"></i>
+                <span>Plant Health</span>
+            </a>
+            <a href="#camera" class="nav-link" data-page="camera">
+                <i class="fas fa-camera"></i>
+                <span>Camera</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 id="pageTitle">Dashboard</h1>
+            <div class="header-actions">
+                <span id="connectionStatus" class="status-indicator">
+                    <i class="fas fa-circle"></i> Connected
+                </span>
+            </div>
+        </header>
+
+        <!-- Page Container -->
+        <div class="page-container">
+            <!-- Dashboard Page -->
+            <div id="page-dashboard" class="page active">
+                <div class="dashboard-grid">
+                    <!-- Sensor Cards -->
+                    <div class="card sensor-card">
+                        <div class="card-header">
+                            <i class="fas fa-temperature-high"></i>
+                            <h3>Temperature</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="sensor-value">
+                                <span class="value" id="tempValue">--</span>
+                                <span class="unit">°C</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card sensor-card">
+                        <div class="card-header">
+                            <i class="fas fa-droplet"></i>
+                            <h3>Humidity</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="sensor-value">
+                                <span class="value" id="humidityValue">--</span>
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card sensor-card">
+                        <div class="card-header">
+                            <i class="fas fa-gauge"></i>
+                            <h3>Pressure</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="sensor-value">
+                                <span class="value" id="pressureValue">--</span>
+                                <span class="unit">hPa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card sensor-card">
+                        <div class="card-header">
+                            <i class="fas fa-wind"></i>
+                            <h3>Air Quality</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="sensor-value">
+                                <span class="value" id="gasValue">--</span>
+                                <span class="unit">Ω</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Camera Feed -->
+                    <div class="card camera-card">
+                        <div class="card-header">
+                            <i class="fas fa-camera"></i>
+                            <h3>Live View</h3>
+                        </div>
+                        <div class="card-body">
+                            <img id="liveCamera" src="/api/camera/live" alt="Camera feed" class="camera-feed">
+                        </div>
+                    </div>
+
+                    <!-- Device Control -->
+                    <div class="card devices-card">
+                        <div class="card-header">
+                            <i class="fas fa-toggle-on"></i>
+                            <h3>Devices</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="devicesList" class="devices-list">
+                                <!-- Devices loaded dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="card stats-card">
+                        <div class="card-header">
+                            <i class="fas fa-chart-simple"></i>
+                            <h3>Quick Stats</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="stat-item">
+                                <span class="stat-label">Active Project:</span>
+                                <span class="stat-value" id="activeProject">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Days Running:</span>
+                                <span class="stat-value" id="daysRunning">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Data Points:</span>
+                                <span class="stat-value" id="dataPoints">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Chart -->
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <i class="fas fa-chart-line"></i>
+                            <h3>Recent Trends (24h)</h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="dashboardChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projects Page -->
+            <div id="page-projects" class="page">
+                <div class="page-header">
+                    <button class="btn btn-primary" id="newProjectBtn">
+                        <i class="fas fa-plus"></i> New Project
+                    </button>
+                </div>
+                <div id="projectsList" class="projects-list">
+                    <!-- Projects loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Data Logs Page -->
+            <div id="page-data-logs" class="page">
+                <div class="page-header">
+                    <div class="form-group">
+                        <label>Time Range:</label>
+                        <select id="timeRange">
+                            <option value="1">Last Hour</option>
+                            <option value="6">Last 6 Hours</option>
+                            <option value="24" selected>Last 24 Hours</option>
+                            <option value="168">Last 7 Days</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" id="exportDataBtn">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="dataLogsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grow Diary Page -->
+            <div id="page-diary" class="page">
+                <div class="page-header">
+                    <button class="btn btn-primary" id="newEntryBtn">
+                        <i class="fas fa-plus"></i> New Entry
+                    </button>
+                </div>
+                <div id="diaryEntries" class="diary-entries">
+                    <!-- Entries loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Settings Page -->
+            <div id="page-settings" class="page">
+                <div class="settings-container">
+                    <div class="settings-section" id="deviceSettings">
+                        <!-- Device settings loaded dynamically -->
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h2>Alert Settings</h2>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="alertsEnabled"> Enable Alerts
+                                    </label>
+                                </div>
+                                <div class="settings-grid">
+                                    <div class="form-group">
+                                        <label>Min Temperature (°C)</label>
+                                        <input type="number" id="tempMin" step="0.5">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Max Temperature (°C)</label>
+                                        <input type="number" id="tempMax" step="0.5">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Min Humidity (%)</label>
+                                        <input type="number" id="humidityMin" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Max Humidity (%)</label>
+                                        <input type="number" id="humidityMax" step="1">
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" id="saveAlertSettings">
+                                    <i class="fas fa-save"></i> Save Alert Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time-lapse Page -->
+            <div id="page-timelapse" class="page">
+                <div class="page-header">
+                    <div class="timelapse-controls">
+                        <button class="btn btn-primary" id="startTimelapse">
+                            <i class="fas fa-play"></i> Start Capture
+                        </button>
+                        <button class="btn btn-danger" id="stopTimelapse">
+                            <i class="fas fa-stop"></i> Stop Capture
+                        </button>
+                        <button class="btn btn-success" id="generateVideo">
+                            <i class="fas fa-film"></i> Generate Video
+                        </button>
+                    </div>
+                </div>
+                <div class="timelapse-status card">
+                    <div class="card-body">
+                        <p>Status: <span id="timelapseStatus">Stopped</span></p>
+                        <p>Images Captured: <span id="imageCount">0</span></p>
+                        <p>Interval: <input type="number" id="timelapseInterval" value="300" min="60"> seconds</p>
+                    </div>
+                </div>
+                <div id="timelapseVideos" class="videos-list">
+                    <!-- Videos loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Plant Health Page -->
+            <div id="page-plant-health" class="page">
+                <div class="page-header">
+                    <button class="btn btn-primary" id="analyzeCamera">
+                        <i class="fas fa-camera"></i> Analyze from Camera
+                    </button>
+                    <button class="btn btn-secondary" id="uploadImageBtn">
+                        <i class="fas fa-upload"></i> Upload Image
+                    </button>
+                    <input type="file" id="imageUpload" accept="image/*" style="display:none">
+                </div>
+                <div id="healthResults" class="health-results">
+                    <!-- Results shown here -->
+                </div>
+            </div>
+
+            <!-- Camera Page -->
+            <div id="page-camera" class="page">
+                <div class="page-header">
+                    <button class="btn btn-primary" id="captureSnapshot">
+                        <i class="fas fa-camera"></i> Capture Snapshot
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <img id="mainCamera" src="/api/camera/live" alt="Camera" class="camera-main">
+                    </div>
+                </div>
+                <div id="photoGallery" class="photo-gallery">
+                    <!-- Photos loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/projects.js"></script>
+    <script src="/static/js/data_logs.js"></script>
+    <script src="/static/js/diary.js"></script>
+    <script src="/static/js/settings.js"></script>
+    <script src="/static/js/timelapse.js"></script>
+    <script src="/static/js/plant_health.js"></script>
+    <script src="/static/js/camera.js"></script>
+</body>
+</html>

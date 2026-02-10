@@ -1,0 +1,37 @@
+# Grow Tent Automation Configuration
+
+# Device GPIO Pins (BCM numbering)
+gpio_pins:
+  exhaust_fan: 5
+  circulatory_fans: 6
+  lights: 13
+  humidifier: 16
+  heater: 19
+  dehumidifier: 20
+  pump: 21
+  unused: 26
+
+# BME680 Sensor
+bme680:
+  i2c_address: 0x76  # Try 0x77 if this doesn't work
+
+# Camera Settings
+camera:
+  resolution:
+    width: 1920
+    height: 1080
+  rotation: 0
+
+# Sensor Reading Intervals (seconds)
+sensor_read_interval: 30
+data_log_interval: 60
+
+# Time-lapse
+timelapse:
+  default_interval: 300  # seconds (5 minutes)
+  default_fps: 30
+
+# Web Server
+server:
+  host: "0.0.0.0"
+  port: 8000
