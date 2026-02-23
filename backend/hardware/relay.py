@@ -1,6 +1,6 @@
 """Relay HAT control using RPi.GPIO.
 
-Handles 8-channel relay HAT with active LOW logic:
+Handles 9-channel relay HAT with active LOW logic:
 - GPIO.LOW = Relay energized = Device ON
 - GPIO.HIGH = Relay de-energized = Device OFF
 """
@@ -20,7 +20,7 @@ from backend.config import GPIO_PINS
 logger = logging.getLogger(__name__)
 
 class RelayController:
-    """Control 8-channel relay HAT with active LOW logic."""
+    """Control 9-channel relay HAT with active LOW logic."""
     
     def __init__(self, gpio_pins: Dict[str, int] = None):
         """Initialize relay controller.
@@ -55,7 +55,7 @@ class RelayController:
                 self.device_states[device] = False
                 logger.info(f"Initialized {device} on GPIO {pin} (default OFF)")
             
-            logger.info("GPIO setup complete for all relays")
+            logger.info(f"GPIO setup complete for {len(self.gpio_pins)} relays")
         except Exception as e:
             logger.error(f"Error setting up GPIO: {e}")
             raise

@@ -6,7 +6,7 @@ A production-ready Raspberry Pi grow tent automation system with comprehensive m
 
 ### Core Functionality
 - **Real-time Monitoring**: BME680 environmental sensor (temperature, humidity, pressure, air quality)
-- **Device Control**: 8-channel relay control for lights, fans, pumps, and climate devices
+- **Device Control**: 9-channel relay control for lights, fans, pumps, and climate devices
 - **Automation Engine**: Intelligent scheduling and threshold-based control
 - **Web Interface**: Modern, responsive dashboard accessible on your local network
 - **Telegram Bot**: Remote monitoring and control via Telegram commands
@@ -24,21 +24,30 @@ A production-ready Raspberry Pi grow tent automation system with comprehensive m
 
 ### Required Components
 - Raspberry Pi 4 Model B (4GB+ recommended)
-- 8-Channel Relay HAT (active LOW logic)
+- 9-Channel Relay HAT (active LOW logic)
 - BME680 Environmental Sensor (I²C)
 - Raspberry Pi HQ Camera (or compatible camera module)
 - MicroSD card (32GB+ recommended)
 - 5V power supply for Raspberry Pi
 
-### GPIO Pin Assignments (BCM Numbering)
-- **Relay 1 (GPIO 5)**: Exhaust Fan
-- **Relay 2 (GPIO 6)**: Circulatory Fans
-- **Relay 3 (GPIO 13)**: Lights
-- **Relay 4 (GPIO 16)**: Humidifier
-- **Relay 5 (GPIO 19)**: Heater
-- **Relay 6 (GPIO 20)**: Dehumidifier
-- **Relay 7 (GPIO 21)**: Pump (irrigation)
-- **Relay 8 (GPIO 26)**: Unused/reserved
+### Camera Requirements
+- **libcamera-apps** must be installed for camera functionality
+- Uses `rpicam-jpeg` command for image capture
+- Install with: `sudo apt install libcamera-apps`
+
+### GPIO Pin Assignments (BCM Numbering) - 9 Relays
+
+| Relay | GPIO Pin | Physical Pin | Device |
+|-------|----------|--------------|--------|
+| 1 | GPIO 5 | Pin 29 | Lights |
+| 2 | GPIO 6 | Pin 31 | Air Pump |
+| 3 | GPIO 13 | Pin 33 | Nutrient Pump |
+| 4 | GPIO 16 | Pin 36 | Circulatory Fan 1 |
+| 5 | GPIO 19 | Pin 35 | Circulatory Fan 2 |
+| 6 | GPIO 20 | Pin 38 | Exhaust Fan |
+| 7 | GPIO 21 | Pin 40 | Humidifier |
+| 8 | GPIO 23 | Pin 16 | Heater |
+| 9 | GPIO 24 | Pin 18 | Dehumidifier |
 
 ### BME680 Sensor Connections (I²C)
 - **VCC** → 3.3V (Pin 1 or 17)
@@ -57,6 +66,9 @@ sudo apt update && sudo apt upgrade -y
 # Install system dependencies
 sudo apt install -y python3-pip python3-venv git i2c-tools ffmpeg
 
+# Install camera support (REQUIRED for camera functionality)
+sudo apt install -y libcamera-apps
+
 # Enable I²C and Camera
 sudo raspi-config
 # Navigate to: Interfacing Options → I2C → Enable
@@ -70,7 +82,10 @@ sudo raspi-config
 # Test I²C devices (should show BME680 at 0x76 or 0x77)
 sudo i2cdetect -y 1
 
-# Test camera
+# Test camera with rpicam-jpeg
+rpicam-jpeg -o test.jpg --width 1920 --height 1080
+
+# List available cameras
 libcamera-hello --list-cameras
 ```
 
@@ -197,17 +212,17 @@ Once configured, interact with your grow tent via Telegram:
 - `/status` - Get current sensor readings and device states
 - `/devices` - List all devices and their states
 - `/on <device>` - Turn device on (e.g., `/on lights`)
-- `/off <device>` - Turn device off (e.g., `/off pump`)
+- `/off <device>` - Turn device off (e.g., `/off nutrient_pump`)
 - `/alerts` - View current alert settings
 - `/photo` - Get current camera snapshot
 
-**Device names**: `exhaust_fan`, `circulatory_fans`, `lights`, `humidifier`, `heater`, `dehumidifier`, `pump`
+**Device names**: `lights`, `air_pump`, `nutrient_pump`, `circulatory_fan_1`, `circulatory_fan_2`, `exhaust_fan`, `humidifier`, `heater`, `dehumidifier`
 
 ## 💻 Web Interface Usage
 
 ### Dashboard
 - View real-time sensor data (temperature, humidity, pressure, air quality)
-- Monitor all device states with on/off toggles
+- Monitor all 9 device states with on/off toggles
 - Live camera feed
 - Recent trends chart
 
@@ -267,9 +282,10 @@ Once configured, interact with your grow tent via Telegram:
 - **Mode**: Auto (schedule + thresholds)
 - **Thresholds**: Turns on if temp > 28°C or humidity > 75%
 
-### Circulatory Fans
+### Circulatory Fan 1 & 2
 - **Default**: Always on
 - **Mode**: Schedule-based
+- Two independently controllable fans
 
 ### Humidifier
 - **Default**: Threshold-based
@@ -286,10 +302,15 @@ Once configured, interact with your grow tent via Telegram:
 - **Mode**: Threshold
 - **Threshold**: Turns on if temp < 18°C
 
-### Pump
+### Nutrient Pump
 - **Default**: 5 minutes at 08:00 and 20:00
 - **Mode**: Schedule-based
 - Customize watering times in Settings
+
+### Air Pump
+- **Default**: Always on for oxygenation
+- **Mode**: Schedule-based
+- Critical for hydroponic systems
 
 ## 🔍 Troubleshooting
 
@@ -305,12 +326,15 @@ sudo i2cdetect -y 1
 ### Camera Not Working
 
 ```bash
+# Verify libcamera-apps is installed
+sudo apt install libcamera-apps
+
+# Test camera with rpicam-jpeg
+rpicam-jpeg -o test.jpg --width 1920 --height 1080
+
 # Verify camera is enabled
 sudo raspi-config
 # Interface Options → Camera → Enable
-
-# Test camera
-libcamera-still -o test.jpg
 
 # Check camera permissions
 sudo usermod -aG video $USER
@@ -414,7 +438,7 @@ grow_tent_automation/
 ### Running Tests
 ```bash
 source venv/bin/activate
-pytest
+python test_hardware.py
 ```
 
 ### API Documentation
@@ -422,6 +446,14 @@ pytest
 - Access at: `http://raspberry-pi-ip:8000/docs`
 
 ## 📝 Changelog
+
+### Version 1.1.0 (Current)
+- Updated to 9-relay system with new device names
+- Camera now uses rpicam-jpeg command via subprocess
+- Split circulatory fans into two independent controls
+- Renamed pump to nutrient_pump
+- Added air_pump for oxygenation
+- Improved device display names throughout UI
 
 ### Version 1.0.0 (Initial Release)
 - Complete grow tent automation system

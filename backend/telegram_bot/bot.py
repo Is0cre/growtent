@@ -21,7 +21,7 @@ except ImportError:
     TELEGRAM_AVAILABLE = False
     logging.warning("python-telegram-bot not available")
 
-from backend.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GPIO_PINS
+from backend.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GPIO_PINS, get_device_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class TelegramBot:
             "/off <device> - Turn device off\n"
             "/alerts - View alert settings\n"
             "/photo - Get camera snapshot\n\n"
-            "Device names: " + ", ".join([d for d in GPIO_PINS.keys() if d != 'unused']),
+            "Device names: " + ", ".join(GPIO_PINS.keys()),
             parse_mode='Markdown'
         )
     
@@ -81,10 +81,9 @@ class TelegramBot:
             
             message += "🔌 *Devices*\n"
             for device, state in device_states.items():
-                if device != 'unused':
-                    status = "✅ ON" if state else "❌ OFF"
-                    device_display = device.replace('_', ' ').title()
-                    message += f"{device_display}: {status}\n"
+                status = "✅ ON" if state else "❌ OFF"
+                device_display = get_device_display_name(device)
+                message += f"{device_display}: {status}\n"
             
             await update.message.reply_text(message, parse_mode='Markdown')
             
@@ -99,10 +98,9 @@ class TelegramBot:
             
             message = "🔌 *Device List*\n\n"
             for device, state in device_states.items():
-                if device != 'unused':
-                    status = "✅ ON" if state else "❌ OFF"
-                    device_display = device.replace('_', ' ').title()
-                    message += f"• {device_display}: {status}\n"
+                status = "✅ ON" if state else "❌ OFF"
+                device_display = get_device_display_name(device)
+                message += f"• {device_display}: {status}\n"
             
             message += "\nUse /on <device> or /off <device> to control"
             
@@ -118,20 +116,20 @@ class TelegramBot:
             if not context.args:
                 await update.message.reply_text(
                     "Usage: /on <device>\n"
-                    "Available devices: " + ", ".join([d for d in GPIO_PINS.keys() if d != 'unused'])
+                    "Available devices: " + ", ".join(GPIO_PINS.keys())
                 )
                 return
             
             device_name = context.args[0].lower()
             
-            if device_name not in GPIO_PINS or device_name == 'unused':
+            if device_name not in GPIO_PINS:
                 await update.message.reply_text(f"Unknown device: {device_name}")
                 return
             
             success = self.engine.turn_device_on(device_name)
             
             if success:
-                device_display = device_name.replace('_', ' ').title()
+                device_display = get_device_display_name(device_name)
                 await update.message.reply_text(f"✅ Turned ON {device_display}")
             else:
                 await update.message.reply_text(f"❌ Failed to turn on {device_name}")
@@ -146,20 +144,20 @@ class TelegramBot:
             if not context.args:
                 await update.message.reply_text(
                     "Usage: /off <device>\n"
-                    "Available devices: " + ", ".join([d for d in GPIO_PINS.keys() if d != 'unused'])
+                    "Available devices: " + ", ".join(GPIO_PINS.keys())
                 )
                 return
             
             device_name = context.args[0].lower()
             
-            if device_name not in GPIO_PINS or device_name == 'unused':
+            if device_name not in GPIO_PINS:
                 await update.message.reply_text(f"Unknown device: {device_name}")
                 return
             
             success = self.engine.turn_device_off(device_name)
             
             if success:
-                device_display = device_name.replace('_', ' ').title()
+                device_display = get_device_display_name(device_name)
                 await update.message.reply_text(f"❌ Turned OFF {device_display}")
             else:
                 await update.message.reply_text(f"❌ Failed to turn off {device_name}")

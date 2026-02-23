@@ -63,10 +63,16 @@ class AutomationEngine:
         """Initialize default device settings in database if not present."""
         existing_settings = db.get_all_device_settings()
         
-        for device_name, default_settings in DEFAULT_DEVICE_SETTINGS.items():
+        # Initialize settings for all devices in GPIO_PINS
+        for device_name in GPIO_PINS.keys():
             if device_name not in existing_settings:
+                default = DEFAULT_DEVICE_SETTINGS.get(device_name, {
+                    "enabled": True,
+                    "schedule": [],
+                    "mode": "manual"
+                })
                 logger.info(f"Initializing default settings for {device_name}")
-                db.save_device_settings(device_name, default_settings)
+                db.save_device_settings(device_name, default)
     
     def _init_alert_settings(self):
         """Initialize default alert settings if not present."""
@@ -178,9 +184,6 @@ class AutomationEngine:
             
             # Evaluate each device
             for device_name in GPIO_PINS.keys():
-                if device_name == 'unused':
-                    continue
-                
                 # Get settings for this device (use defaults if not found)
                 settings = all_settings.get(device_name, DEFAULT_DEVICE_SETTINGS.get(device_name, {}))
                 

@@ -17,16 +17,31 @@ for directory in [CONFIG_DIR, DATA_DIR, LOGS_DIR, DATA_DIR / "photos", DATA_DIR 
 # Database
 DATABASE_PATH = DATA_DIR / "database.db"
 
-# GPIO Pin assignments (BCM numbering)
+# GPIO Pin assignments (BCM numbering) - 9 relays
+# Active LOW logic: GPIO LOW = device ON, GPIO HIGH = device OFF
 GPIO_PINS = {
-    "exhaust_fan": 5,      # Relay 1 - GPIO 5 (pin 29)
-    "circulatory_fans": 6, # Relay 2 - GPIO 6 (pin 31)
-    "lights": 13,          # Relay 3 - GPIO 13 (pin 33)
-    "humidifier": 16,      # Relay 4 - GPIO 16 (pin 36)
-    "heater": 19,          # Relay 5 - GPIO 19 (pin 35)
-    "dehumidifier": 20,    # Relay 6 - GPIO 20 (pin 38)
-    "pump": 21,            # Relay 7 - GPIO 21 (pin 40)
-    "unused": 26           # Relay 8 - GPIO 26 (pin 37)
+    "lights":            5,   # Relay 1  - GPIO 5   (physical pin 29)
+    "air_pump":          6,   # Relay 2  - GPIO 6   (physical pin 31) - Air Pump for oxygenation
+    "nutrient_pump":     13,  # Relay 3  - GPIO 13  (physical pin 33) - Nutrient solution pump
+    "circulatory_fan_1": 16,  # Relay 4  - GPIO 16  (physical pin 36)
+    "circulatory_fan_2": 19,  # Relay 5  - GPIO 19  (physical pin 35)
+    "exhaust_fan":       20,  # Relay 6  - GPIO 20  (physical pin 38)
+    "humidifier":        21,  # Relay 7  - GPIO 21  (physical pin 40)
+    "heater":            23,  # Relay 8  - GPIO 23  (physical pin 16)
+    "dehumidifier":      24,  # Relay 9  - GPIO 24  (physical pin 18)
+}
+
+# Human-readable display names for devices
+DEVICE_DISPLAY_NAMES = {
+    "lights": "Lights",
+    "air_pump": "Air Pump",
+    "nutrient_pump": "Nutrient Pump",
+    "circulatory_fan_1": "Circulatory Fan 1",
+    "circulatory_fan_2": "Circulatory Fan 2",
+    "exhaust_fan": "Exhaust Fan",
+    "humidifier": "Humidifier",
+    "heater": "Heater",
+    "dehumidifier": "Dehumidifier",
 }
 
 # BME680 Sensor (I²C)
@@ -58,7 +73,14 @@ DEFAULT_DEVICE_SETTINGS = {
         "humidity_threshold": 75.0,  # Turn on above 75%
         "mode": "auto"  # schedule + thresholds
     },
-    "circulatory_fans": {
+    "circulatory_fan_1": {
+        "enabled": True,
+        "schedule": [
+            {"on": "00:00", "off": "23:59"}  # Always on
+        ],
+        "mode": "schedule"
+    },
+    "circulatory_fan_2": {
         "enabled": True,
         "schedule": [
             {"on": "00:00", "off": "23:59"}  # Always on
@@ -80,11 +102,18 @@ DEFAULT_DEVICE_SETTINGS = {
         "temp_threshold": 18.0,  # Turn on below 18°C
         "mode": "threshold"
     },
-    "pump": {
+    "nutrient_pump": {
         "enabled": True,
         "schedule": [
             {"time": "08:00", "duration": 5},  # 5 minutes at 8 AM
             {"time": "20:00", "duration": 5}   # 5 minutes at 8 PM
+        ],
+        "mode": "schedule"
+    },
+    "air_pump": {
+        "enabled": True,
+        "schedule": [
+            {"on": "00:00", "off": "23:59"}  # Always on for oxygenation
         ],
         "mode": "schedule"
     }
@@ -126,3 +155,14 @@ def save_config(config: Dict[str, Any]) -> None:
     """Save configuration to YAML file."""
     with open(CONFIG_FILE, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)
+
+def get_device_display_name(device_name: str) -> str:
+    """Get the human-readable display name for a device.
+    
+    Args:
+        device_name: Internal device name
+        
+    Returns:
+        Human-readable display name
+    """
+    return DEVICE_DISPLAY_NAMES.get(device_name, device_name.replace('_', ' ').title())

@@ -18,12 +18,13 @@ cd grow_tent_automation
 
 The installation script will:
 1. Install system dependencies
-2. Create Python virtual environment
-3. Install Python packages
-4. Set up configuration files
-5. Create data directories
-6. Test the installation
-7. Optionally install systemd service
+2. Install libcamera-apps for camera support
+3. Create Python virtual environment
+4. Install Python packages
+5. Set up configuration files
+6. Create data directories
+7. Test the installation
+8. Optionally install systemd service
 
 ## Quick Configuration
 
@@ -81,13 +82,23 @@ hostname -I
 Before connecting real devices, test in simulation mode:
 
 ```bash
-./test_hardware.py
+python test_hardware.py
 ```
 
 This will verify:
-- ✅ GPIO/Relay control
+- ✅ GPIO/Relay control (9 relays)
 - ✅ BME680 sensor reading
-- ✅ Camera functionality
+- ✅ Camera functionality (rpicam-jpeg)
+
+## Test Camera Manually
+
+```bash
+# Test camera capture
+rpicam-jpeg -o test.jpg --width 1920 --height 1080
+
+# If command not found, install libcamera-apps:
+sudo apt install libcamera-apps
+```
 
 ## First Steps in the Web Interface
 
@@ -103,7 +114,7 @@ This will verify:
 
 3. **Monitor Dashboard**
    - Real-time sensor data
-   - Device controls
+   - Device controls (all 9 devices)
    - Live camera feed
 
 4. **Start Time-lapse** (Optional)
@@ -116,11 +127,25 @@ This will verify:
 Send these commands to your bot:
 
 - `/status` - Current readings and device states
-- `/devices` - List all devices
+- `/devices` - List all 9 devices
 - `/on lights` - Turn lights on
-- `/off pump` - Turn pump off
+- `/off nutrient_pump` - Turn nutrient pump off
 - `/photo` - Get snapshot
 - `/alerts` - View alert settings
+
+## Device Names (9 Relays)
+
+| Device Name | Display Name | GPIO Pin |
+|-------------|--------------|----------|
+| `lights` | Lights | GPIO 5 |
+| `air_pump` | Air Pump | GPIO 6 |
+| `nutrient_pump` | Nutrient Pump | GPIO 13 |
+| `circulatory_fan_1` | Circulatory Fan 1 | GPIO 16 |
+| `circulatory_fan_2` | Circulatory Fan 2 | GPIO 19 |
+| `exhaust_fan` | Exhaust Fan | GPIO 20 |
+| `humidifier` | Humidifier | GPIO 21 |
+| `heater` | Heater | GPIO 23 |
+| `dehumidifier` | Dehumidifier | GPIO 24 |
 
 ## Common Issues
 
@@ -148,12 +173,15 @@ sudo i2cdetect -y 1
 
 ### Camera not working
 ```bash
+# Install camera support
+sudo apt install libcamera-apps
+
 # Enable camera
 sudo raspi-config
 # Interface Options → Camera → Enable
 
 # Test camera
-libcamera-still -o test.jpg
+rpicam-jpeg -o test.jpg --width 640 --height 480
 ```
 
 ## File Structure
@@ -195,11 +223,13 @@ sudo systemctl status grow-tent
 
 - **Lights**: On 06:00-22:00 (16 hours)
 - **Exhaust Fan**: 15 min/hour + auto (temp > 28°C or humidity > 75%)
-- **Circulatory Fans**: Always on
+- **Circulatory Fan 1**: Always on
+- **Circulatory Fan 2**: Always on
 - **Humidifier**: Auto (humidity < 50%)
 - **Dehumidifier**: Auto (humidity > 70%)
 - **Heater**: Auto (temp < 18°C)
-- **Pump**: 5 min at 08:00 and 20:00
+- **Nutrient Pump**: 5 min at 08:00 and 20:00
+- **Air Pump**: Always on for oxygenation
 
 All settings can be customized in the web interface!
 
@@ -207,7 +237,7 @@ All settings can be customized in the web interface!
 
 1. Check full documentation: `README.md`
 2. View logs: `tail -f logs/grow_tent.log`
-3. Test hardware: `./test_hardware.py`
+3. Test hardware: `python test_hardware.py`
 4. Check service status: `sudo systemctl status grow-tent`
 
 ## Safety Note
