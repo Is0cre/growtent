@@ -1,1 +1,371 @@
-\"\"\"Main FastAPI application for grow tent automation system.\"\"\"\nimport sys\nimport logging\nimport signal\nimport threading\nfrom pathlib import Path\nfrom contextlib import asynccontextmanager\nfrom datetime import datetime\n\nfrom fastapi import FastAPI\nfrom fastapi.staticfiles import StaticFiles\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom fastapi.responses import FileResponse, JSONResponse\n\n# Add backend to path\nsys.path.insert(0, str(Path(__file__).parent.parent))\n\nfrom backend.config import (\n    HOST, PORT, BASE_DIR, DATA_DIR,\n    get_settings, get_secrets,\n    SCHEDULER_ENABLED\n)\nfrom backend.utils.logger import setup_logging\nfrom backend.automation.engine import AutomationEngine\nfrom backend.telegram_bot.bot import TelegramBot\nfrom backend.external_sync import init_sync_module, get_sync_module\nfrom backend.analysis.ai_analyzer import init_ai_analyzer, get_ai_analyzer\nfrom backend.task_scheduler import init_task_scheduler, get_task_scheduler\nfrom backend.database import db\n\n# Import API routers\nfrom backend.api import (\n    projects, sensors, devices, settings, diary, \n    timelapse, camera, plant_health\n)\nfrom backend.api import sync as sync_api\nfrom backend.api import analysis as analysis_api\nfrom backend.api import system_settings as system_settings_api\n\n# Setup logging\nsetup_logging()\nlogger = logging.getLogger(__name__)\n\n# Global instances\nautomation_engine: AutomationEngine = None\ntelegram_bot: TelegramBot = None\nsync_module = None\nai_analyzer = None\ntask_scheduler = None\n\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    \"\"\"Manage application lifecycle.\"\"\"\n    global automation_engine, telegram_bot, sync_module, ai_analyzer, task_scheduler\n    \n    logger.info(\"🚀 Starting Grow Tent Automation System...\")\n    \n    # Load configuration\n    config = get_settings()\n    secrets = get_secrets()\n    \n    # Initialize automation engine\n    try:\n        automation_engine = AutomationEngine()\n        automation_engine.start()\n        logger.info(\"✅ Automation engine started\")\n    except Exception as e:\n        logger.error(f\"Failed to start automation engine: {e}\")\n        automation_engine = None\n    \n    # Set automation engine reference in API modules\n    if automation_engine:\n        devices.set_automation_engine(automation_engine)\n        camera.set_automation_engine(automation_engine)\n    \n    # Initialize external sync module\n    try:\n        sync_module = init_sync_module(config, secrets)\n        sync_api.set_sync_module(sync_module)\n        if sync_module.enabled:\n            logger.info(\"✅ External sync module initialized\")\n        else:\n            logger.info(\"ℹ️ External sync module disabled (not configured)\")\n    except Exception as e:\n        logger.error(f\"Failed to initialize sync module: {e}\")\n        sync_module = None\n    \n    # Initialize AI analyzer\n    try:\n        ai_analyzer = init_ai_analyzer(config, secrets)\n        if ai_analyzer.enabled:\n            logger.info(\"✅ AI analyzer initialized\")\n        else:\n            logger.info(\"ℹ️ AI analyzer disabled (not configured)\")\n    except Exception as e:\n        logger.error(f\"Failed to initialize AI analyzer: {e}\")\n        ai_analyzer = None\n    \n    # Initialize Telegram bot in separate thread\n    try:\n        telegram_bot = TelegramBot(automation_engine)\n        telegram_thread = threading.Thread(target=telegram_bot.start, daemon=True)\n        telegram_thread.start()\n        logger.info(\"✅ Telegram bot started\")\n    except Exception as e:\n        logger.error(f\"Failed to start Telegram bot: {e}\")\n        telegram_bot = None\n    \n    # Set module references for analysis API\n    analysis_api.set_modules(\n        ai_analyzer=ai_analyzer,\n        telegram_bot=telegram_bot,\n        sync_module=sync_module,\n        camera=automation_engine.camera if automation_engine else None\n    )\n    \n    # Initialize task scheduler\n    if SCHEDULER_ENABLED:\n        try:\n            task_scheduler = init_task_scheduler()\n            task_scheduler.set_dependencies(\n                ai_analyzer=ai_analyzer,\n                sync_module=sync_module,\n                telegram_bot=telegram_bot,\n                camera=automation_engine.camera if automation_engine else None\n            )\n            task_scheduler.start()\n            logger.info(\"✅ Task scheduler started\")\n        except Exception as e:\n            logger.error(f\"Failed to start task scheduler: {e}\")\n            task_scheduler = None\n    else:\n        logger.info(\"ℹ️ Task scheduler disabled in configuration\")\n    \n    # Resume time-lapse for active projects after restart\n    _resume_timelapse_captures()\n    \n    logger.info(\"✅ System started successfully\")\n    \n    yield\n    \n    # Shutdown\n    logger.info(\"🛑 Shutting down...\")\n    \n    if task_scheduler:\n        task_scheduler.stop()\n    \n    if automation_engine:\n        automation_engine.stop()\n    \n    if telegram_bot:\n        telegram_bot.stop()\n    \n    logger.info(\"👋 Shutdown complete\")\n\n\ndef _resume_timelapse_captures():\n    \"\"\"Resume time-lapse captures for active projects after restart.\"\"\"\n    try:\n        projects_needing_timelapse = db.get_projects_needing_timelapse()\n        for project in projects_needing_timelapse:\n            logger.info(\n                f\"Resuming time-lapse for project: {project['name']} \"\n                f\"(ID: {project['id']}, interval: {project.get('timelapse_interval', 300)}s)\"\n            )\n            # The automation engine handles the actual capture based on project settings\n    except Exception as e:\n        logger.error(f\"Error resuming timelapse captures: {e}\")\n\n\n# Create FastAPI app\napp = FastAPI(\n    title=\"Grow Tent Automation API\",\n    description=\"Production-ready Raspberry Pi grow tent automation system with AI analysis and external sync\",\n    version=\"2.0.0\",\n    lifespan=lifespan\n)\n\n# CORS middleware\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=[\"*\"],\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\n\n# Include API routers\napp.include_router(projects.router)\napp.include_router(sensors.router)\napp.include_router(devices.router)\napp.include_router(settings.router)\napp.include_router(diary.router)\napp.include_router(timelapse.router)\napp.include_router(camera.router)\napp.include_router(plant_health.router)\napp.include_router(sync_api.router)\napp.include_router(analysis_api.router)\napp.include_router(system_settings_api.router)\n\n# Mount static files\nfrontend_dir = BASE_DIR / \"frontend\"\ndata_dir = BASE_DIR / \"data\"\n\nif frontend_dir.exists():\n    app.mount(\"/static\", StaticFiles(directory=str(frontend_dir)), name=\"static\")\n\nif data_dir.exists():\n    app.mount(\"/data\", StaticFiles(directory=str(data_dir)), name=\"data\")\n\n\n# Root endpoint\n@app.get(\"/\")\nasync def root():\n    \"\"\"Root endpoint - serve frontend.\"\"\"\n    index_file = frontend_dir / \"index.html\"\n    if index_file.exists():\n        return FileResponse(index_file)\n    return {\n        \"name\": \"Grow Tent Automation API\",\n        \"version\": \"2.0.0\",\n        \"status\": \"running\",\n        \"docs\": \"/docs\"\n    }\n\n\n@app.get(\"/api/health\")\nasync def health_check():\n    \"\"\"Comprehensive health check endpoint.\"\"\"\n    try:\n        # Check automation engine\n        automation_status = \"running\" if automation_engine and automation_engine.running else \"stopped\"\n        \n        # Check Telegram bot\n        telegram_status = \"running\" if telegram_bot and telegram_bot.running else \"stopped\"\n        \n        # Check sync module\n        sync_status = \"enabled\" if sync_module and sync_module.enabled else \"disabled\"\n        \n        # Check AI analyzer\n        ai_status = \"enabled\" if ai_analyzer and ai_analyzer.enabled else \"disabled\"\n        \n        # Check scheduler\n        scheduler_status = \"running\" if task_scheduler and task_scheduler.running else \"stopped\"\n        \n        # Get last sync status\n        last_sync = db.get_last_successful_sync('full')\n        \n        # Get active project\n        active_project = db.get_active_project()\n        \n        # Get latest sensor data\n        sensor_data = db.get_latest_sensor_data()\n        \n        return {\n            \"status\": \"healthy\",\n            \"timestamp\": datetime.now().isoformat(),\n            \"components\": {\n                \"automation_engine\": automation_status,\n                \"telegram_bot\": telegram_status,\n                \"external_sync\": sync_status,\n                \"ai_analyzer\": ai_status,\n                \"task_scheduler\": scheduler_status\n            },\n            \"data\": {\n                \"active_project\": active_project.get('name') if active_project else None,\n                \"last_sync\": last_sync.get('timestamp') if last_sync else None,\n                \"latest_sensor_reading\": sensor_data.get('timestamp') if sensor_data else None\n            }\n        }\n    except Exception as e:\n        return JSONResponse(\n            status_code=500,\n            content={\"status\": \"unhealthy\", \"error\": str(e)}\n        )\n\n\n@app.get(\"/api/system/info\")\nasync def system_info():\n    \"\"\"Get system information.\"\"\"\n    try:\n        import platform\n        from backend.config import GPIO_PINS\n        \n        return {\n            \"success\": True,\n            \"data\": {\n                \"platform\": platform.system(),\n                \"python_version\": platform.python_version(),\n                \"api_version\": \"2.0.0\",\n                \"devices\": list(GPIO_PINS.keys()),\n                \"automation_running\": automation_engine.running if automation_engine else False,\n                \"telegram_enabled\": telegram_bot is not None and telegram_bot.running,\n                \"external_sync_enabled\": sync_module.enabled if sync_module else False,\n                \"ai_analysis_enabled\": ai_analyzer.enabled if ai_analyzer else False,\n                \"scheduler_enabled\": task_scheduler is not None and task_scheduler.running\n            }\n        }\n    except Exception as e:\n        return {\"success\": False, \"error\": str(e)}\n\n\n@app.get(\"/api/system/status\")\nasync def system_status():\n    \"\"\"Get detailed system status.\"\"\"\n    try:\n        # Get active project with timelapse info\n        active_project = db.get_active_project()\n        if active_project:\n            active_project['timelapse_count'] = db.get_timelapse_image_count(active_project['id'])\n        \n        # Get latest sensor data\n        sensor_data = db.get_latest_sensor_data()\n        \n        # Get latest AI analysis\n        latest_analysis = db.get_latest_ai_analysis()\n        \n        # Get scheduled tasks status\n        scheduled_tasks = []\n        if task_scheduler:\n            scheduled_tasks = task_scheduler.get_task_status()\n        \n        # Get sync status\n        last_sync = db.get_last_successful_sync('full')\n        \n        return {\n            \"success\": True,\n            \"data\": {\n                \"active_project\": active_project,\n                \"sensor_data\": sensor_data,\n                \"latest_analysis\": {\n                    \"timestamp\": latest_analysis.get('timestamp') if latest_analysis else None,\n                    \"health_score\": latest_analysis.get('health_score') if latest_analysis else None\n                } if latest_analysis else None,\n                \"last_sync\": {\n                    \"timestamp\": last_sync.get('timestamp') if last_sync else None,\n                    \"items_synced\": last_sync.get('items_synced') if last_sync else 0\n                } if last_sync else None,\n                \"scheduled_tasks\": scheduled_tasks\n            }\n        }\n    except Exception as e:\n        return {\"success\": False, \"error\": str(e)}\n\n\n# Signal handlers for graceful shutdown\ndef signal_handler(sig, frame):\n    \"\"\"Handle shutdown signals.\"\"\"\n    logger.info(f\"Received signal {sig}, shutting down...\")\n    sys.exit(0)\n\n\nsignal.signal(signal.SIGINT, signal_handler)\nsignal.signal(signal.SIGTERM, signal_handler)\n\n\nif __name__ == \"__main__\":\n    import uvicorn\n    \n    logger.info(f\"Starting server on {HOST}:{PORT}\")\n    logger.info(f\"Web UI: http://{HOST}:{PORT}\")\n    logger.info(f\"API Docs: http://{HOST}:{PORT}/docs\")\n    \n    uvicorn.run(\n        \"main:app\",\n        host=HOST,\n        port=PORT,\n        reload=False,\n        log_level=\"info\"\n    )\n
+"""Main FastAPI application for grow tent automation system."""
+import sys
+import logging
+import signal
+import threading
+from pathlib import Path
+from contextlib import asynccontextmanager
+from datetime import datetime
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+
+# Add backend to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from backend.config import (
+    HOST, PORT, BASE_DIR, DATA_DIR,
+    get_settings, get_secrets,
+    SCHEDULER_ENABLED
+)
+from backend.utils.logger import setup_logging
+from backend.automation.engine import AutomationEngine
+from backend.telegram_bot.bot import TelegramBot
+from backend.external_sync import init_sync_module, get_sync_module
+from backend.analysis.ai_analyzer import init_ai_analyzer, get_ai_analyzer
+from backend.task_scheduler import init_task_scheduler, get_task_scheduler
+from backend.database import db
+
+# Import API routers
+from backend.api import (
+    projects, sensors, devices, settings, diary, 
+    timelapse, camera, plant_health
+)
+from backend.api import sync as sync_api
+from backend.api import analysis as analysis_api
+from backend.api import system_settings as system_settings_api
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
+# Global instances
+automation_engine: AutomationEngine = None
+telegram_bot: TelegramBot = None
+sync_module = None
+ai_analyzer = None
+task_scheduler = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle."""
+    global automation_engine, telegram_bot, sync_module, ai_analyzer, task_scheduler
+    
+    logger.info("🚀 Starting Grow Tent Automation System...")
+    
+    # Load configuration
+    config = get_settings()
+    secrets = get_secrets()
+    
+    # Initialize automation engine
+    try:
+        automation_engine = AutomationEngine()
+        automation_engine.start()
+        logger.info("✅ Automation engine started")
+    except Exception as e:
+        logger.error(f"Failed to start automation engine: {e}")
+        automation_engine = None
+    
+    # Set automation engine reference in API modules
+    if automation_engine:
+        devices.set_automation_engine(automation_engine)
+        camera.set_automation_engine(automation_engine)
+    
+    # Initialize external sync module
+    try:
+        sync_module = init_sync_module(config, secrets)
+        sync_api.set_sync_module(sync_module)
+        if sync_module.enabled:
+            logger.info("✅ External sync module initialized")
+        else:
+            logger.info("ℹ️ External sync module disabled (not configured)")
+    except Exception as e:
+        logger.error(f"Failed to initialize sync module: {e}")
+        sync_module = None
+    
+    # Initialize AI analyzer
+    try:
+        ai_analyzer = init_ai_analyzer(config, secrets)
+        if ai_analyzer.enabled:
+            logger.info("✅ AI analyzer initialized")
+        else:
+            logger.info("ℹ️ AI analyzer disabled (not configured)")
+    except Exception as e:
+        logger.error(f"Failed to initialize AI analyzer: {e}")
+        ai_analyzer = None
+    
+    # Initialize Telegram bot in separate thread
+    try:
+        telegram_bot = TelegramBot(automation_engine)
+        telegram_thread = threading.Thread(target=telegram_bot.start, daemon=True)
+        telegram_thread.start()
+        logger.info("✅ Telegram bot started")
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}")
+        telegram_bot = None
+    
+    # Set module references for analysis API
+    analysis_api.set_modules(
+        ai_analyzer=ai_analyzer,
+        telegram_bot=telegram_bot,
+        sync_module=sync_module,
+        camera=automation_engine.camera if automation_engine else None
+    )
+    
+    # Initialize task scheduler
+    if SCHEDULER_ENABLED:
+        try:
+            task_scheduler = init_task_scheduler()
+            task_scheduler.set_dependencies(
+                ai_analyzer=ai_analyzer,
+                sync_module=sync_module,
+                telegram_bot=telegram_bot,
+                camera=automation_engine.camera if automation_engine else None
+            )
+            task_scheduler.start()
+            logger.info("✅ Task scheduler started")
+        except Exception as e:
+            logger.error(f"Failed to start task scheduler: {e}")
+            task_scheduler = None
+    else:
+        logger.info("ℹ️ Task scheduler disabled in configuration")
+    
+    # Resume time-lapse for active projects after restart
+    _resume_timelapse_captures()
+    
+    logger.info("✅ System started successfully")
+    
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Shutting down...")
+    
+    if task_scheduler:
+        task_scheduler.stop()
+    
+    if automation_engine:
+        automation_engine.stop()
+    
+    if telegram_bot:
+        telegram_bot.stop()
+    
+    logger.info("👋 Shutdown complete")
+
+
+def _resume_timelapse_captures():
+    """Resume time-lapse captures for active projects after restart."""
+    try:
+        projects_needing_timelapse = db.get_projects_needing_timelapse()
+        for project in projects_needing_timelapse:
+            logger.info(
+                f"Resuming time-lapse for project: {project['name']} "
+                f"(ID: {project['id']}, interval: {project.get('timelapse_interval', 300)}s)"
+            )
+            # The automation engine handles the actual capture based on project settings
+    except Exception as e:
+        logger.error(f"Error resuming timelapse captures: {e}")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="Grow Tent Automation API",
+    description="Production-ready Raspberry Pi grow tent automation system with AI analysis and external sync",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API routers
+app.include_router(projects.router)
+app.include_router(sensors.router)
+app.include_router(devices.router)
+app.include_router(settings.router)
+app.include_router(diary.router)
+app.include_router(timelapse.router)
+app.include_router(camera.router)
+app.include_router(plant_health.router)
+app.include_router(sync_api.router)
+app.include_router(analysis_api.router)
+app.include_router(system_settings_api.router)
+
+# Mount static files
+frontend_dir = BASE_DIR / "frontend"
+data_dir = BASE_DIR / "data"
+
+if frontend_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
+
+if data_dir.exists():
+    app.mount("/data", StaticFiles(directory=str(data_dir)), name="data")
+
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint - serve frontend."""
+    index_file = frontend_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {
+        "name": "Grow Tent Automation API",
+        "version": "2.0.0",
+        "status": "running",
+        "docs": "/docs"
+    }
+
+
+@app.get("/api/health")
+async def health_check():
+    """Comprehensive health check endpoint."""
+    try:
+        # Check automation engine
+        automation_status = "running" if automation_engine and automation_engine.running else "stopped"
+        
+        # Check Telegram bot
+        telegram_status = "running" if telegram_bot and telegram_bot.running else "stopped"
+        
+        # Check sync module
+        sync_status = "enabled" if sync_module and sync_module.enabled else "disabled"
+        
+        # Check AI analyzer
+        ai_status = "enabled" if ai_analyzer and ai_analyzer.enabled else "disabled"
+        
+        # Check scheduler
+        scheduler_status = "running" if task_scheduler and task_scheduler.running else "stopped"
+        
+        # Get last sync status
+        last_sync = db.get_last_successful_sync('full')
+        
+        # Get active project
+        active_project = db.get_active_project()
+        
+        # Get latest sensor data
+        sensor_data = db.get_latest_sensor_data()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "components": {
+                "automation_engine": automation_status,
+                "telegram_bot": telegram_status,
+                "external_sync": sync_status,
+                "ai_analyzer": ai_status,
+                "task_scheduler": scheduler_status
+            },
+            "data": {
+                "active_project": active_project.get('name') if active_project else None,
+                "last_sync": last_sync.get('timestamp') if last_sync else None,
+                "latest_sensor_reading": sensor_data.get('timestamp') if sensor_data else None
+            }
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "unhealthy", "error": str(e)}
+        )
+
+
+@app.get("/api/system/info")
+async def system_info():
+    """Get system information."""
+    try:
+        import platform
+        from backend.config import GPIO_PINS
+        
+        return {
+            "success": True,
+            "data": {
+                "platform": platform.system(),
+                "python_version": platform.python_version(),
+                "api_version": "2.0.0",
+                "devices": list(GPIO_PINS.keys()),
+                "automation_running": automation_engine.running if automation_engine else False,
+                "telegram_enabled": telegram_bot is not None and telegram_bot.running,
+                "external_sync_enabled": sync_module.enabled if sync_module else False,
+                "ai_analysis_enabled": ai_analyzer.enabled if ai_analyzer else False,
+                "scheduler_enabled": task_scheduler is not None and task_scheduler.running
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/system/status")
+async def system_status():
+    """Get detailed system status."""
+    try:
+        # Get active project with timelapse info
+        active_project = db.get_active_project()
+        if active_project:
+            active_project['timelapse_count'] = db.get_timelapse_image_count(active_project['id'])
+        
+        # Get latest sensor data
+        sensor_data = db.get_latest_sensor_data()
+        
+        # Get latest AI analysis
+        latest_analysis = db.get_latest_ai_analysis()
+        
+        # Get scheduled tasks status
+        scheduled_tasks = []
+        if task_scheduler:
+            scheduled_tasks = task_scheduler.get_task_status()
+        
+        # Get sync status
+        last_sync = db.get_last_successful_sync('full')
+        
+        return {
+            "success": True,
+            "data": {
+                "active_project": active_project,
+                "sensor_data": sensor_data,
+                "latest_analysis": {
+                    "timestamp": latest_analysis.get('timestamp') if latest_analysis else None,
+                    "health_score": latest_analysis.get('health_score') if latest_analysis else None
+                } if latest_analysis else None,
+                "last_sync": {
+                    "timestamp": last_sync.get('timestamp') if last_sync else None,
+                    "items_synced": last_sync.get('items_synced') if last_sync else 0
+                } if last_sync else None,
+                "scheduled_tasks": scheduled_tasks
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# Signal handlers for graceful shutdown
+def signal_handler(sig, frame):
+    """Handle shutdown signals."""
+    logger.info(f"Received signal {sig}, shutting down...")
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    logger.info(f"Starting server on {HOST}:{PORT}")
+    logger.info(f"Web UI: http://{HOST}:{PORT}")
+    logger.info(f"API Docs: http://{HOST}:{PORT}/docs")
+    
+    uvicorn.run(
+        "main:app",
+        host=HOST,
+        port=PORT,
+        reload=False,
+        log_level="info"
+    )
