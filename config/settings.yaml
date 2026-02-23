@@ -1,0 +1,95 @@
+# Grow Tent Automation - Main Settings Configuration
+# This file CAN be committed to git (no secrets here)
+
+# Device GPIO Pins (BCM numbering)
+gpio_pins:
+  lights: 5
+  air_pump: 6
+  nutrient_pump: 13
+  circulatory_fan_1: 16
+  circulatory_fan_2: 19
+  exhaust_fan: 20
+  humidifier: 21
+  heater: 23
+  dehumidifier: 24
+
+# BME680 Sensor Settings
+sensor:
+  i2c_address: 0x76
+  read_interval: 30
+  log_interval: 60
+
+# Camera Settings
+camera:
+  resolution:
+    width: 1920
+    height: 1080
+  rotation: 0
+
+# Time-lapse Settings
+timelapse:
+  default_interval: 300
+  default_fps: 30
+  auto_start_on_project: true
+
+# Web Server Settings
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+# Alert Thresholds
+alerts:
+  enabled: true
+  temperature:
+    min: 15.0
+    max: 32.0
+  humidity:
+    min: 40.0
+    max: 80.0
+  notification_interval: 300
+
+# External Server Sync Settings
+external_sync:
+  enabled: false
+  sync_interval: 300
+  sync_photos: true
+  sync_sensor_data: true
+  sync_project_info: true
+  sync_analysis_reports: true
+  retry_attempts: 3
+  retry_delay: 30
+  endpoints:
+    photos: "/photos/upload"
+    sensor_data: "/sensor-data"
+    project_info: "/projects"
+    analysis_reports: "/reports"
+
+# AI Photo Analysis Settings
+ai_analysis:
+  enabled: false
+  daily_schedule_time: "12:00"
+  analysis_prompt: |
+    Analyze this cannabis/plant photo. Assess:
+    1. Overall plant health (score 1-10)
+    2. Growth stage (seedling, vegetative, flowering, etc.)
+    3. Any visible issues (nutrient deficiency, pests, diseases, stress signs)
+    4. Color and appearance assessment
+    5. Recommendations for improvement
+    
+    Provide a structured response with these sections.
+  send_to_telegram: true
+  send_to_external_server: true
+
+# Background Scheduler Settings
+scheduler:
+  enabled: true
+  daily_report_time: "08:00"
+  persist_state: true
+
+# Logging Settings
+logging:
+  level: "INFO"
+  max_file_size: 10485760
+  backup_count: 5
+  log_to_console: true
+  log_to_file: true

@@ -24,18 +24,30 @@ wheels/
 venv/
 env/
 ENV/
+.venv/
 
 # Environment variables
 .env
+.env.local
+.env.production
+
+# Secrets - IMPORTANT: Never commit secrets!
+config/secrets.yaml
+config/secrets.yml
+*.secret
+*.secrets
 
 # Database
 data/database.db
 data/database.db-journal
+data/*.db
+data/*.db-journal
 
-# Data files
+# Data files - project specific data
 data/photos/
 data/timelapse/
 data/videos/
+data/projects/
 data/temp/
 
 # Logs
@@ -48,10 +60,32 @@ logs/
 *.swp
 *.swo
 *~
+.project
+.settings/
 
 # OS
 .DS_Store
 Thumbs.db
+.Spotlight-V100
+.Trashes
 
-# Config
-config/config.yaml
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Build
+*.pdf
+
+# Jupyter
+.ipynb_checkpoints/
+
+# APScheduler job store
+jobs.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

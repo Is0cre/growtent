@@ -2,6 +2,7 @@
 Description=Grow Tent Automation System
 Documentation=https://github.com/your-repo/grow-tent-automation
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -11,8 +12,17 @@ WorkingDirectory=/home/pi/grow_tent_automation
 Environment="PATH=/home/pi/grow_tent_automation/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=-/home/pi/grow_tent_automation/.env
 ExecStart=/home/pi/grow_tent_automation/venv/bin/python backend/main.py
+
+# Restart configuration for stability
 Restart=always
 RestartSec=10
+# No limit on restart attempts
+StartLimitBurst=0
+
+# Watchdog configuration
+WatchdogSec=60
+
+# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=grow-tent
@@ -23,6 +33,12 @@ PrivateTmp=true
 
 # Resource limits
 LimitNOFILE=65536
+MemoryMax=512M
+CPUQuota=80%
+
+# Timeout configuration
+TimeoutStartSec=60
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target

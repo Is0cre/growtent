@@ -50,6 +50,14 @@
                 <i class="fas fa-camera"></i>
                 <span>Camera</span>
             </a>
+            <a href="#ai-analysis" class="nav-link" data-page="ai-analysis">
+                <i class="fas fa-robot"></i>
+                <span>AI Analysis</span>
+            </a>
+            <a href="#system-settings" class="nav-link" data-page="system-settings">
+                <i class="fas fa-cogs"></i>
+                <span>System Settings</span>
+            </a>
         </nav>
     </div>
 
@@ -334,6 +342,341 @@
                     <!-- Photos loaded dynamically -->
                 </div>
             </div>
+
+            <!-- AI Analysis Page -->
+            <div id="page-ai-analysis" class="page">
+                <div class="page-header">
+                    <h2>AI Plant Analysis</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="analyzeNowBtn">
+                            <i class="fas fa-robot"></i> Analyze Now
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Analysis Status Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>Analysis Status</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="analysisStatus" class="status-grid">
+                            <div class="status-item">
+                                <span class="label">Status:</span>
+                                <span class="value" id="aiStatusEnabled">Loading...</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">Last Analysis:</span>
+                                <span class="value" id="aiStatusLastAnalysis">--</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">Last Health Score:</span>
+                                <span class="value" id="aiStatusHealthScore">--</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">Total Analyses:</span>
+                                <span class="value" id="aiStatusTotal">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis History -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-history"></i>
+                        <h3>Analysis History</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="analysisHistory" class="analysis-list">
+                            <!-- Analyses loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Settings Page -->
+            <div id="page-system-settings" class="page">
+                <div class="page-header">
+                    <h2>System Settings</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" id="reloadConfigBtn">
+                            <i class="fas fa-sync"></i> Reload Config
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Settings Tabs -->
+                <div class="settings-tabs">
+                    <button class="tab-btn active" data-tab="timelapse-settings">Time-lapse</button>
+                    <button class="tab-btn" data-tab="alerts-settings">Alerts</button>
+                    <button class="tab-btn" data-tab="ai-settings">AI Analysis</button>
+                    <button class="tab-btn" data-tab="sync-settings">External Sync</button>
+                    <button class="tab-btn" data-tab="telegram-settings">Telegram</button>
+                    <button class="tab-btn" data-tab="scheduled-tasks">Scheduled Tasks</button>
+                </div>
+
+                <!-- Time-lapse Settings -->
+                <div id="timelapse-settings" class="settings-tab-content active">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-video"></i>
+                            <h3>Time-lapse Settings</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="timelapseSettingsForm" class="settings-form">
+                                <div class="form-group">
+                                    <label for="tlInterval">Default Interval (seconds):</label>
+                                    <input type="number" id="tlInterval" min="30" value="300">
+                                </div>
+                                <div class="form-group">
+                                    <label for="tlFps">Video FPS:</label>
+                                    <input type="number" id="tlFps" min="1" max="60" value="30">
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="tlAutoStart" checked>
+                                        Auto-start on new project
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Settings -->
+                <div id="alerts-settings" class="settings-tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-bell"></i>
+                            <h3>Alert Thresholds</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="alertSettingsForm" class="settings-form">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="alertsEnabled" checked>
+                                        Enable Alerts
+                                    </label>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="tempMin">Min Temperature (°C):</label>
+                                        <input type="number" id="tempMin" step="0.5" value="15">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tempMax">Max Temperature (°C):</label>
+                                        <input type="number" id="tempMax" step="0.5" value="32">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="humidityMin">Min Humidity (%):</label>
+                                        <input type="number" id="humidityMin" step="1" value="40">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="humidityMax">Max Humidity (%):</label>
+                                        <input type="number" id="humidityMax" step="1" value="80">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notificationInterval">Notification Interval (seconds):</label>
+                                    <input type="number" id="notificationInterval" min="60" value="300">
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Analysis Settings -->
+                <div id="ai-settings" class="settings-tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-robot"></i>
+                            <h3>AI Analysis Settings</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="aiSettingsForm" class="settings-form">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="aiEnabled">
+                                        Enable Daily AI Analysis
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="aiScheduleTime">Daily Analysis Time:</label>
+                                    <input type="time" id="aiScheduleTime" value="12:00">
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="aiSendTelegram" checked>
+                                        Send to Telegram
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="aiSendExternal" checked>
+                                        Sync to External Server
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Settings</button>
+                            </form>
+                            <hr>
+                            <h4>OpenAI API Configuration</h4>
+                            <form id="openaiSettingsForm" class="settings-form">
+                                <div class="form-group">
+                                    <label for="openaiApiKey">API Key:</label>
+                                    <input type="password" id="openaiApiKey" placeholder="sk-...">
+                                    <small>Leave blank to keep existing key</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="openaiModel">Model:</label>
+                                    <select id="openaiModel">
+                                        <option value="gpt-4o">GPT-4o (recommended)</option>
+                                        <option value="gpt-4-vision-preview">GPT-4 Vision</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save API Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- External Sync Settings -->
+                <div id="sync-settings" class="settings-tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>External Server Sync</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="sync-status-bar" id="syncStatusBar">
+                                <span class="status-indicator" id="syncStatusIndicator">
+                                    <i class="fas fa-circle"></i> Checking...
+                                </span>
+                                <span id="lastSyncTime">Last sync: --</span>
+                                <button class="btn btn-small btn-primary" id="syncNowBtn">
+                                    <i class="fas fa-sync"></i> Sync Now
+                                </button>
+                                <button class="btn btn-small btn-secondary" id="testConnectionBtn">
+                                    <i class="fas fa-plug"></i> Test Connection
+                                </button>
+                            </div>
+                            <form id="syncSettingsForm" class="settings-form">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="syncEnabled">
+                                        Enable External Sync
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="syncInterval">Sync Interval (seconds):</label>
+                                    <input type="number" id="syncInterval" min="60" value="300">
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="syncPhotos" checked>
+                                        Sync Photos
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="syncSensorData" checked>
+                                        Sync Sensor Data
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="syncProjectInfo" checked>
+                                        Sync Project Info
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="syncAnalysisReports" checked>
+                                        Sync AI Analysis Reports
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Sync Settings</button>
+                            </form>
+                            <hr>
+                            <h4>External Server Configuration</h4>
+                            <form id="externalServerForm" class="settings-form">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="serverEnabled">
+                                        Server Enabled
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="serverUrl">Server URL:</label>
+                                    <input type="url" id="serverUrl" placeholder="https://your-server.com/api">
+                                </div>
+                                <div class="form-group">
+                                    <label for="authType">Authentication Type:</label>
+                                    <select id="authType">
+                                        <option value="api_key">API Key</option>
+                                        <option value="bearer">Bearer Token</option>
+                                        <option value="basic">Basic Auth</option>
+                                        <option value="none">None</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="apiKeyGroup">
+                                    <label for="serverApiKey">API Key:</label>
+                                    <input type="password" id="serverApiKey" placeholder="Your API key">
+                                </div>
+                                <div class="form-group" id="bearerGroup" style="display:none;">
+                                    <label for="bearerToken">Bearer Token:</label>
+                                    <input type="password" id="bearerToken" placeholder="Your bearer token">
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Server Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Telegram Settings -->
+                <div id="telegram-settings" class="settings-tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fab fa-telegram"></i>
+                            <h3>Telegram Configuration</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="telegramSettingsForm" class="settings-form">
+                                <div class="form-group">
+                                    <label for="telegramBotToken">Bot Token:</label>
+                                    <input type="password" id="telegramBotToken" placeholder="1234567890:ABC...">
+                                    <small>Leave blank to keep existing token</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="telegramChatId">Chat ID:</label>
+                                    <input type="text" id="telegramChatId" placeholder="632820309">
+                                </div>
+                                <button type="submit" class="btn btn-primary">Save Telegram Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scheduled Tasks -->
+                <div id="scheduled-tasks" class="settings-tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-clock"></i>
+                            <h3>Scheduled Tasks</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="scheduledTasksList" class="tasks-list">
+                                <!-- Tasks loaded dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -355,5 +698,7 @@
     <script src="/static/js/timelapse.js"></script>
     <script src="/static/js/plant_health.js"></script>
     <script src="/static/js/camera.js"></script>
+    <script src="/static/js/ai_analysis.js"></script>
+    <script src="/static/js/system_settings.js"></script>
 </body>
 </html>

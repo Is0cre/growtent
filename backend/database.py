@@ -6,8 +6,12 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 import threading
+import logging
 
 from backend.config import DATABASE_PATH
+
+logger = logging.getLogger(__name__)
+
 
 class Database:
     """Thread-safe database manager."""
@@ -35,7 +39,7 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
-            # Projects table
+            # Projects table (with timelapse state fields)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,9 +48,26 @@ class Database:
                     end_date TIMESTAMP,
                     notes TEXT,
                     status TEXT DEFAULT 'active',
+                    timelapse_enabled INTEGER DEFAULT 1,
+                    timelapse_interval INTEGER DEFAULT 300,
+                    timelapse_last_capture TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            
+            # Add timelapse columns if they don't exist (migration)
+            try:
+                cursor.execute("ALTER TABLE projects ADD COLUMN timelapse_enabled INTEGER DEFAULT 1")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE projects ADD COLUMN timelapse_interval INTEGER DEFAULT 300")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                cursor.execute("ALTER TABLE projects ADD COLUMN timelapse_last_capture TIMESTAMP")
+            except sqlite3.OperationalError:
+                pass
             
             # Sensor logs table
             cursor.execute("""
@@ -141,17 +162,83 @@ class Database:
                 )
             """)
             
+            # AI Analysis table (NEW)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_analysis (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER,
+                    timestamp TIMESTAMP NOT NULL,
+                    photo_path TEXT,
+                    analysis_text TEXT,
+                    health_score INTEGER,
+                    recommendations TEXT,
+                    model TEXT,
+                    tokens_used INTEGER,
+                    synced_to_external INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_analysis_project 
+                ON ai_analysis(project_id)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_analysis_timestamp 
+                ON ai_analysis(timestamp)
+            """)
+            
+            # Sync log table (NEW)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sync_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sync_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    details TEXT,
+                    error_message TEXT,
+                    items_synced INTEGER DEFAULT 0,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_sync_log_timestamp 
+                ON sync_log(timestamp)
+            """)
+            
+            # Scheduled tasks table (NEW - for APScheduler persistence)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scheduled_tasks (
+                    id TEXT PRIMARY KEY,
+                    task_name TEXT NOT NULL,
+                    schedule_type TEXT NOT NULL,
+                    schedule_value TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    last_run TIMESTAMP,
+                    next_run TIMESTAMP,
+                    run_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             conn.commit()
+            logger.info("Database schema initialized")
     
     # Project methods
-    def create_project(self, name: str, notes: str = "") -> int:
+    def create_project(self, name: str, notes: str = "", 
+                      timelapse_enabled: bool = True,
+                      timelapse_interval: int = 300) -> int:
         """Create a new project."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO projects (name, start_date, notes, status)
-                VALUES (?, ?, ?, 'active')
-            """, (name, datetime.now(), notes))
+                INSERT INTO projects (name, start_date, notes, status, 
+                                     timelapse_enabled, timelapse_interval)
+                VALUES (?, ?, ?, 'active', ?, ?)
+            """, (name, datetime.now(), notes, 
+                  1 if timelapse_enabled else 0, timelapse_interval))
             conn.commit()
             return cursor.lastrowid
     
@@ -185,7 +272,9 @@ class Database:
         """Update project details."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            allowed_fields = ['name', 'notes', 'status', 'end_date']
+            allowed_fields = ['name', 'notes', 'status', 'end_date',
+                            'timelapse_enabled', 'timelapse_interval',
+                            'timelapse_last_capture']
             updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
             
             if not updates:
@@ -200,7 +289,33 @@ class Database:
     
     def end_project(self, project_id: int) -> bool:
         """End a project."""
-        return self.update_project(project_id, status='completed', end_date=datetime.now())
+        return self.update_project(
+            project_id, 
+            status='completed', 
+            end_date=datetime.now(),
+            timelapse_enabled=0
+        )
+    
+    def archive_project(self, project_id: int) -> bool:
+        """Archive a project."""
+        return self.update_project(project_id, status='archived')
+    
+    def update_timelapse_capture(self, project_id: int) -> bool:
+        """Update the last timelapse capture time for a project."""
+        return self.update_project(
+            project_id, 
+            timelapse_last_capture=datetime.now()
+        )
+    
+    def get_projects_needing_timelapse(self) -> List[Dict[str, Any]]:
+        """Get active projects that need timelapse capture."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM projects 
+                WHERE status = 'active' AND timelapse_enabled = 1
+            """)
+            return [dict(row) for row in cursor.fetchall()]
     
     # Sensor log methods
     def log_sensor_data(self, project_id: Optional[int], temperature: float, 
@@ -426,6 +541,17 @@ class Database:
             """, (project_id,))
             return [dict(row) for row in cursor.fetchall()]
     
+    def get_timelapse_image_count(self, project_id: int) -> int:
+        """Get count of timelapse images for a project."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) as count FROM timelapse_images WHERE project_id = ?",
+                (project_id,)
+            )
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+    
     # System settings methods
     def get_system_setting(self, key: str) -> Optional[str]:
         """Get a system setting."""
@@ -475,6 +601,184 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("SELECT device_name, state FROM device_states")
             return {row['device_name']: row['state'] for row in cursor.fetchall()}
+    
+    # AI Analysis methods (NEW)
+    def save_ai_analysis(self, project_id: Optional[int], photo_path: str,
+                        analysis_text: str, health_score: Optional[int] = None,
+                        recommendations: str = "", model: str = "",
+                        tokens_used: Optional[int] = None) -> int:
+        """Save AI analysis result."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO ai_analysis 
+                (project_id, timestamp, photo_path, analysis_text, health_score,
+                 recommendations, model, tokens_used)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (project_id, datetime.now(), photo_path, analysis_text,
+                  health_score, recommendations, model, tokens_used))
+            conn.commit()
+            return cursor.lastrowid
+    
+    def get_ai_analysis(self, analysis_id: int) -> Optional[Dict[str, Any]]:
+        """Get AI analysis by ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM ai_analysis WHERE id = ?", (analysis_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_ai_analyses(self, project_id: Optional[int] = None,
+                       limit: int = 50) -> List[Dict[str, Any]]:
+        """Get AI analyses with optional project filter."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if project_id:
+                cursor.execute("""
+                    SELECT * FROM ai_analysis 
+                    WHERE project_id = ?
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (project_id, limit))
+            else:
+                cursor.execute("""
+                    SELECT * FROM ai_analysis 
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_latest_ai_analysis(self, project_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """Get the most recent AI analysis."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if project_id:
+                cursor.execute("""
+                    SELECT * FROM ai_analysis 
+                    WHERE project_id = ?
+                    ORDER BY timestamp DESC LIMIT 1
+                """, (project_id,))
+            else:
+                cursor.execute("""
+                    SELECT * FROM ai_analysis 
+                    ORDER BY timestamp DESC LIMIT 1
+                """)
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def mark_analysis_synced(self, analysis_id: int) -> bool:
+        """Mark an analysis as synced to external server."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE ai_analysis SET synced_to_external = 1 WHERE id = ?
+            """, (analysis_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    
+    # Sync log methods (NEW)
+    def log_sync(self, sync_type: str, status: str, details: str = "",
+                error_message: str = "", items_synced: int = 0) -> int:
+        """Log a sync operation."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO sync_log 
+                (sync_type, status, details, error_message, items_synced)
+                VALUES (?, ?, ?, ?, ?)
+            """, (sync_type, status, details, error_message, items_synced))
+            conn.commit()
+            return cursor.lastrowid
+    
+    def get_sync_logs(self, sync_type: Optional[str] = None,
+                     limit: int = 100) -> List[Dict[str, Any]]:
+        """Get sync logs with optional type filter."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if sync_type:
+                cursor.execute("""
+                    SELECT * FROM sync_log 
+                    WHERE sync_type = ?
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (sync_type, limit))
+            else:
+                cursor.execute("""
+                    SELECT * FROM sync_log 
+                    ORDER BY timestamp DESC LIMIT ?
+                """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_last_successful_sync(self, sync_type: str) -> Optional[Dict[str, Any]]:
+        """Get the last successful sync for a type."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM sync_log 
+                WHERE sync_type = ? AND status = 'success'
+                ORDER BY timestamp DESC LIMIT 1
+            """, (sync_type,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    # Scheduled tasks methods (NEW)
+    def save_scheduled_task(self, task_id: str, task_name: str,
+                           schedule_type: str, schedule_value: str,
+                           enabled: bool = True) -> bool:
+        """Save or update a scheduled task."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO scheduled_tasks 
+                (id, task_name, schedule_type, schedule_value, enabled)
+                VALUES (?, ?, ?, ?, ?)
+            """, (task_id, task_name, schedule_type, schedule_value,
+                  1 if enabled else 0))
+            conn.commit()
+            return True
+    
+    def get_scheduled_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get a scheduled task by ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM scheduled_tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_all_scheduled_tasks(self) -> List[Dict[str, Any]]:
+        """Get all scheduled tasks."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM scheduled_tasks ORDER BY task_name")
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def update_task_run_time(self, task_id: str, 
+                            next_run: Optional[datetime] = None) -> bool:
+        """Update task last run time and optionally next run."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if next_run:
+                cursor.execute("""
+                    UPDATE scheduled_tasks 
+                    SET last_run = ?, next_run = ?, run_count = run_count + 1
+                    WHERE id = ?
+                """, (datetime.now(), next_run, task_id))
+            else:
+                cursor.execute("""
+                    UPDATE scheduled_tasks 
+                    SET last_run = ?, run_count = run_count + 1
+                    WHERE id = ?
+                """, (datetime.now(), task_id))
+            conn.commit()
+            return cursor.rowcount > 0
+    
+    def toggle_scheduled_task(self, task_id: str, enabled: bool) -> bool:
+        """Enable or disable a scheduled task."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE scheduled_tasks SET enabled = ? WHERE id = ?
+            """, (1 if enabled else 0, task_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
 
 # Global database instance
 db = Database()

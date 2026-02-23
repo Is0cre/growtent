@@ -6,7 +6,7 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.5.0
 
-# Hardware Control
+# Hardware Control (Raspberry Pi specific)
 RPi.GPIO==0.7.1
 bme680==1.1.1
 smbus2==0.4.3
@@ -15,7 +15,7 @@ picamera2==0.3.16
 # Telegram Bot
 python-telegram-bot==20.7
 
-# Database
+# Configuration
 pyyaml==6.0.1
 
 # Image Processing
@@ -25,8 +25,16 @@ numpy==1.26.2
 # Video Processing
 opencv-python==4.8.1.78
 
-# Optional: OpenAI for plant health analysis
+# OpenAI for plant health analysis
 openai==1.3.7
+
+# HTTP Client for external sync
+requests==2.31.0
+urllib3==2.1.0
+
+# Background Task Scheduler
+APScheduler==3.10.4
+SQLAlchemy==2.0.23
 
 # Development
 pytest==7.4.3
