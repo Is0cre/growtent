@@ -1,1 +1,100 @@
-\"\"\"Logging configuration for grow tent automation system.\"\"\"\nimport logging\nimport sys\nfrom pathlib import Path\nfrom logging.handlers import RotatingFileHandler\nfrom datetime import datetime\n\nfrom backend.config import (\n    LOGS_DIR, LOG_LEVEL, LOG_MAX_SIZE, LOG_BACKUP_COUNT,\n    get_setting\n)\n\n\ndef setup_logging():\n    \"\"\"Configure logging for the application with rotation.\"\"\"\n    # Get logging settings\n    level_str = get_setting('logging.level', LOG_LEVEL)\n    max_size = get_setting('logging.max_file_size', LOG_MAX_SIZE)\n    backup_count = get_setting('logging.backup_count', LOG_BACKUP_COUNT)\n    log_to_console = get_setting('logging.log_to_console', True)\n    log_to_file = get_setting('logging.log_to_file', True)\n    \n    # Map level string to logging level\n    level_map = {\n        'DEBUG': logging.DEBUG,\n        'INFO': logging.INFO,\n        'WARNING': logging.WARNING,\n        'ERROR': logging.ERROR,\n        'CRITICAL': logging.CRITICAL\n    }\n    level = level_map.get(level_str.upper(), logging.INFO)\n    \n    # Create formatter\n    formatter = logging.Formatter(\n        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',\n        datefmt='%Y-%m-%d %H:%M:%S'\n    )\n    \n    # Get root logger\n    root_logger = logging.getLogger()\n    root_logger.setLevel(level)\n    \n    # Remove existing handlers\n    root_logger.handlers = []\n    \n    # Console handler\n    if log_to_console:\n        console_handler = logging.StreamHandler(sys.stdout)\n        console_handler.setLevel(level)\n        console_handler.setFormatter(formatter)\n        root_logger.addHandler(console_handler)\n    \n    # File handler with rotation\n    if log_to_file:\n        LOGS_DIR.mkdir(parents=True, exist_ok=True)\n        log_file = LOGS_DIR / f\"grow_tent_{datetime.now().strftime('%Y%m%d')}.log\"\n        \n        file_handler = RotatingFileHandler(\n            log_file,\n            maxBytes=max_size,\n            backupCount=backup_count,\n            encoding='utf-8'\n        )\n        file_handler.setLevel(level)\n        file_handler.setFormatter(formatter)\n        root_logger.addHandler(file_handler)\n        \n        # Also create an error-only log file\n        error_log_file = LOGS_DIR / \"errors.log\"\n        error_handler = RotatingFileHandler(\n            error_log_file,\n            maxBytes=max_size,\n            backupCount=backup_count,\n            encoding='utf-8'\n        )\n        error_handler.setLevel(logging.ERROR)\n        error_handler.setFormatter(formatter)\n        root_logger.addHandler(error_handler)\n    \n    # Set levels for noisy libraries\n    logging.getLogger('urllib3').setLevel(logging.WARNING)\n    logging.getLogger('httpcore').setLevel(logging.WARNING)\n    logging.getLogger('httpx').setLevel(logging.WARNING)\n    logging.getLogger('apscheduler').setLevel(logging.WARNING)\n    \n    logging.info(f\"Logging initialized at {level_str} level\")\n    if log_to_file:\n        logging.info(f\"Log files in: {LOGS_DIR}\")\n\n\ndef get_logger(name: str) -> logging.Logger:\n    \"\"\"Get a logger with the given name.\n    \n    Args:\n        name: Logger name (usually __name__)\n        \n    Returns:\n        Configured logger instance\n    \"\"\"\n    return logging.getLogger(name)\n
+"""Logging configuration for grow tent automation system."""
+import logging
+import sys
+from pathlib import Path
+from logging.handlers import RotatingFileHandler
+from datetime import datetime
+
+from backend.config import (
+    LOGS_DIR, LOG_LEVEL, LOG_MAX_SIZE, LOG_BACKUP_COUNT,
+    get_setting
+)
+
+
+def setup_logging():
+    """Configure logging for the application with rotation."""
+    # Get logging settings
+    level_str = get_setting('logging.level', LOG_LEVEL)
+    max_size = get_setting('logging.max_file_size', LOG_MAX_SIZE)
+    backup_count = get_setting('logging.backup_count', LOG_BACKUP_COUNT)
+    log_to_console = get_setting('logging.log_to_console', True)
+    log_to_file = get_setting('logging.log_to_file', True)
+    
+    # Map level string to logging level
+    level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL
+    }
+    level = level_map.get(level_str.upper(), logging.INFO)
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Get root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    
+    # Remove existing handlers
+    root_logger.handlers = []
+    
+    # Console handler
+    if log_to_console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+    
+    # File handler with rotation
+    if log_to_file:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        log_file = LOGS_DIR / f"grow_tent_{datetime.now().strftime('%Y%m%d')}.log"
+        
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=max_size,
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+        
+        # Also create an error-only log file
+        error_log_file = LOGS_DIR / "errors.log"
+        error_handler = RotatingFileHandler(
+            error_log_file,
+            maxBytes=max_size,
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(formatter)
+        root_logger.addHandler(error_handler)
+    
+    # Set levels for noisy libraries
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
+    logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('apscheduler').setLevel(logging.WARNING)
+    
+    logging.info(f"Logging initialized at {level_str} level")
+    if log_to_file:
+        logging.info(f"Log files in: {LOGS_DIR}")
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger with the given name.
+    
+    Args:
+        name: Logger name (usually __name__)
+        
+    Returns:
+        Configured logger instance
+    """
+    return logging.getLogger(name)
