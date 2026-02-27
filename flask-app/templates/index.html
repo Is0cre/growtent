@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Grow Tent – Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Grow Tent Dashboard</h1>
+      <div class="spacer"></div>
+      <a class="btn" href="{{ url_for('settings') }}">Settings</a>
+    </header>
+
+    <section class="cards">
+      <div class="card">
+        <h2>Current Stats</h2>
+        {% if latest %}
+          <p class="small">Time: <span id="ts">{{ latest.timestamp }}</span></p>
+          <ul>
+            <li><strong>Temperature:</strong> <span id="temp">{{ latest.temperature_c if latest.temperature_c is not none else "—" }}</span> °C</li>
+            <li><strong>Humidity:</strong> <span id="hum">{{ latest.humidity_pct if latest.humidity_pct is not none else "—" }}</span> %</li>
+            <li><strong>Pressure:</strong> <span id="press">{{ latest.pressure_hpa if latest.pressure_hpa is not none else "—" }}</span> hPa</li>
+            <li><strong>Gas:</strong> <span id="gas">{{ latest.gas_ohms if latest.gas_ohms is not none else "—" }}</span> Ω</li>
+          </ul>
+        {% else %}
+          <p>No data yet.</p>
+        {% endif %}
+        <div class="pills">
+          <button id="refresh" class="btn" type="button">Refresh now</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Relays</h2>
+        {% if latest %}
+        <table class="table">
+          <tbody>
+            {% for k,v in latest.relays.items() %}
+            <tr>
+              <td>{{ k.replace('_',' ').title() }}</td>
+              <td style="text-align:right;">
+                <span id="relay-{{k}}" class="status {{ 'on' if v=='ON' else 'off' }}">{{ v }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+          <p>—</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="graph">
+        <div class="title">Temperature (24h)</div>
+        <img src="{{ url_for('graph', metric='temperature_c') }}" alt="Temperature graph">
+      </div>
+      <div class="graph">
+        <div class="title">Humidity (24h)</div>
+        <img src="{{ url_for('graph', metric='humidity_pct') }}" alt="Humidity graph">
+      </div>
+      <div class="graph">
+        <div class="title">Pressure (24h)</div>
+        <img src="{{ url_for('graph', metric='pressure_hpa') }}" alt="Pressure graph">
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Camera</h2>
+      <div class="camera">
+        {% if cam_available %}
+          <img id="cam" src="/snapshot.jpg?t={{ (latest.timestamp if latest else '') }}" alt="Snapshot">
+          <div class="pills"><button id="snap-now" class="btn" type="button">Snap now</button></div>
+        {% else %}
+          <p><em>Camera not available (Picamera2 not installed or camera disabled).</em></p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function refreshStats(){
+      fetch('/api/stats').then(r => r.json()).then(j => {
+        if(!j.ok) return;
+        const d = j.data;
+        ts.textContent   = d.timestamp || '—';
+        temp.textContent = d.temperature_c ?? '—';
+        hum.textContent  = d.humidity_pct ?? '—';
+        press.textContent= d.pressure_hpa ?? '—';
+        gas.textContent  = d.gas_ohms ?? '—';
+        (d.relays ? Object.keys(d.relays) : []).forEach(k => {
+          const el = document.getElementById('relay-'+k);
+          if(!el) return;
+          el.textContent = d.relays[k];
+          el.classList.toggle('on',  d.relays[k] === 'ON');
+          el.classList.toggle('off', d.relays[k] !== 'ON');
+        });
+      }).catch(()=>{});
+    }
+    refresh.addEventListener('click', refreshStats);
+
+    function refreshSnapshot(){
+      const cam = document.getElementById('cam');
+      if (cam) cam.src = '/snapshot.jpg?t=' + Date.now();
+    }
+    document.getElementById('snap-now')?.addEventListener('click', refreshSnapshot);
+    setInterval(refreshSnapshot, 30000);
+  </script>
+</body>
+</html>
