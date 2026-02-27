@@ -1,5 +1,6 @@
 /**
  * System Settings page functionality
+ * Enhanced with visual controls, time pickers, and sliders
  */
 
 // Tab switching
@@ -23,8 +24,32 @@ async function loadAllSettings() {
         loadAISettings(),
         loadSyncSettings(),
         loadTelegramSettings(),
-        loadScheduledTasks()
+        loadScheduledTasks(),
+        loadOpenRouterModels()
     ]);
+}
+
+// Load available OpenRouter models
+async function loadOpenRouterModels() {
+    try {
+        const response = await fetch('/api/system-settings/openrouter/models');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('openrouterModel');
+            if (select) {
+                select.innerHTML = '';
+                for (const [modelId, displayName] of Object.entries(data.data)) {
+                    const option = document.createElement('option');
+                    option.value = modelId;
+                    option.textContent = displayName;
+                    select.appendChild(option);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading OpenRouter models:', error);
+    }
 }
 
 // Timelapse settings
@@ -34,20 +59,47 @@ async function loadTimelapseSettings() {
         const data = await response.json();
         
         if (data.success) {
-            document.getElementById('tlInterval').value = data.data.default_interval || 300;
+            // Update slider value and display
+            const intervalSlider = document.getElementById('tlIntervalSlider');
+            const intervalDisplay = document.getElementById('tlIntervalDisplay');
+            if (intervalSlider && intervalDisplay) {
+                intervalSlider.value = data.data.default_interval || 300;
+                intervalDisplay.textContent = formatInterval(intervalSlider.value);
+            }
+            
             document.getElementById('tlFps').value = data.data.default_fps || 30;
-            document.getElementById('tlAutoStart').checked = data.data.auto_start_on_project !== false;
+            
+            const autoStartToggle = document.getElementById('tlAutoStart');
+            if (autoStartToggle) {
+                autoStartToggle.checked = data.data.auto_start_on_project !== false;
+            }
         }
     } catch (error) {
         console.error('Error loading timelapse settings:', error);
     }
 }
 
+function formatInterval(seconds) {
+    const sec = parseInt(seconds);
+    if (sec < 60) return `${sec} seconds`;
+    if (sec < 3600) return `${Math.floor(sec / 60)} minutes`;
+    return `${Math.floor(sec / 3600)} hour${sec >= 7200 ? 's' : ''}`;
+}
+
+// Update interval display when slider changes
+document.getElementById('tlIntervalSlider')?.addEventListener('input', (e) => {
+    const display = document.getElementById('tlIntervalDisplay');
+    if (display) {
+        display.textContent = formatInterval(e.target.value);
+    }
+});
+
 document.getElementById('timelapseSettingsForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const intervalSlider = document.getElementById('tlIntervalSlider');
     const data = {
-        default_interval: parseInt(document.getElementById('tlInterval').value),
+        default_interval: parseInt(intervalSlider?.value || 300),
         default_fps: parseInt(document.getElementById('tlFps').value),
         auto_start_on_project: document.getElementById('tlAutoStart').checked
     };
@@ -66,7 +118,7 @@ document.getElementById('timelapseSettingsForm')?.addEventListener('submit', asy
     }
 });
 
-// Alert settings
+// Alert settings with sliders
 async function loadAlertSettings() {
     try {
         const response = await fetch('/api/system-settings/alerts');
@@ -74,10 +126,15 @@ async function loadAlertSettings() {
         
         if (data.success) {
             document.getElementById('alertsEnabled').checked = data.data.enabled !== false;
-            document.getElementById('tempMin').value = data.data.temp_min || 15;
-            document.getElementById('tempMax').value = data.data.temp_max || 32;
-            document.getElementById('humidityMin').value = data.data.humidity_min || 40;
-            document.getElementById('humidityMax').value = data.data.humidity_max || 80;
+            
+            // Temperature sliders
+            updateSliderValue('tempMinSlider', 'tempMinValue', data.data.temp_min || 15);
+            updateSliderValue('tempMaxSlider', 'tempMaxValue', data.data.temp_max || 32);
+            
+            // Humidity sliders
+            updateSliderValue('humidityMinSlider', 'humidityMinValue', data.data.humidity_min || 40);
+            updateSliderValue('humidityMaxSlider', 'humidityMaxValue', data.data.humidity_max || 80);
+            
             document.getElementById('notificationInterval').value = data.data.notification_interval || 300;
         }
     } catch (error) {
@@ -85,15 +142,31 @@ async function loadAlertSettings() {
     }
 }
 
+function updateSliderValue(sliderId, displayId, value) {
+    const slider = document.getElementById(sliderId);
+    const display = document.getElementById(displayId);
+    if (slider) slider.value = value;
+    if (display) display.textContent = value;
+}
+
+// Add event listeners for all sliders
+['tempMinSlider', 'tempMaxSlider', 'humidityMinSlider', 'humidityMaxSlider'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', (e) => {
+        const displayId = id.replace('Slider', 'Value');
+        const display = document.getElementById(displayId);
+        if (display) display.textContent = e.target.value;
+    });
+});
+
 document.getElementById('alertSettingsForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const data = {
         enabled: document.getElementById('alertsEnabled').checked,
-        temp_min: parseFloat(document.getElementById('tempMin').value),
-        temp_max: parseFloat(document.getElementById('tempMax').value),
-        humidity_min: parseFloat(document.getElementById('humidityMin').value),
-        humidity_max: parseFloat(document.getElementById('humidityMax').value),
+        temp_min: parseFloat(document.getElementById('tempMinSlider')?.value || 15),
+        temp_max: parseFloat(document.getElementById('tempMaxSlider')?.value || 32),
+        humidity_min: parseFloat(document.getElementById('humidityMinSlider')?.value || 40),
+        humidity_max: parseFloat(document.getElementById('humidityMaxSlider')?.value || 80),
         notification_interval: parseInt(document.getElementById('notificationInterval').value)
     };
     
@@ -122,7 +195,22 @@ async function loadAISettings() {
             document.getElementById('aiScheduleTime').value = data.data.daily_schedule_time || '12:00';
             document.getElementById('aiSendTelegram').checked = data.data.send_to_telegram !== false;
             document.getElementById('aiSendExternal').checked = data.data.send_to_external_server !== false;
-            document.getElementById('openaiModel').value = data.data.model || 'gpt-4o';
+            
+            // Set the current model
+            const modelSelect = document.getElementById('openrouterModel');
+            if (modelSelect && data.data.model) {
+                modelSelect.value = data.data.model;
+            }
+            
+            // Update API key status
+            const apiKeyStatus = document.getElementById('apiKeyStatus');
+            if (apiKeyStatus) {
+                if (data.data.has_api_key) {
+                    apiKeyStatus.innerHTML = '<span class="status-ok">✓ API key configured</span>';
+                } else {
+                    apiKeyStatus.innerHTML = '<span class="status-missing">✗ API key not set</span>';
+                }
+            }
         }
     } catch (error) {
         console.error('Error loading AI settings:', error);
@@ -153,24 +241,25 @@ document.getElementById('aiSettingsForm')?.addEventListener('submit', async (e) 
     }
 });
 
-document.getElementById('openaiSettingsForm')?.addEventListener('submit', async (e) => {
+document.getElementById('openrouterSettingsForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const data = {
-        api_key: document.getElementById('openaiApiKey').value,
-        model: document.getElementById('openaiModel').value
+        api_key: document.getElementById('openrouterApiKey').value,
+        model: document.getElementById('openrouterModel').value
     };
     
     try {
-        const response = await fetch('/api/system-settings/openai', {
+        const response = await fetch('/api/system-settings/openrouter', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         
         const result = await response.json();
-        document.getElementById('openaiApiKey').value = ''; // Clear for security
+        document.getElementById('openrouterApiKey').value = ''; // Clear for security
         showNotification(result.message || 'Settings saved', result.success ? 'success' : 'error');
+        loadAISettings(); // Refresh to show updated status
     } catch (error) {
         showNotification('Failed to save settings', 'error');
     }
@@ -339,6 +428,16 @@ async function loadTelegramSettings() {
         
         if (data.success) {
             document.getElementById('telegramChatId').value = data.data.chat_id || '';
+            
+            // Show masked token status
+            const tokenStatus = document.getElementById('tokenStatus');
+            if (tokenStatus) {
+                if (data.data.has_bot_token) {
+                    tokenStatus.innerHTML = `<span class="status-ok">✓ Token configured (${data.data.masked_bot_token})</span>`;
+                } else {
+                    tokenStatus.innerHTML = '<span class="status-missing">✗ Token not set</span>';
+                }
+            }
         }
     } catch (error) {
         console.error('Error loading Telegram settings:', error);
@@ -363,6 +462,7 @@ document.getElementById('telegramSettingsForm')?.addEventListener('submit', asyn
         const result = await response.json();
         document.getElementById('telegramBotToken').value = '';
         showNotification(result.message || 'Settings saved', result.success ? 'success' : 'error');
+        loadTelegramSettings();
     } catch (error) {
         showNotification('Failed to save settings', 'error');
     }

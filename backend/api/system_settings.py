@@ -53,9 +53,9 @@ class AIAnalysisSettings(BaseModel):
     send_to_external_server: bool = True
 
 
-class OpenAISecrets(BaseModel):
+class OpenRouterSecrets(BaseModel):
     api_key: str = ""
-    model: str = "gpt-4o"
+    model: str = "anthropic/claude-3.5-sonnet"
 
 
 class TelegramSecrets(BaseModel):
@@ -232,17 +232,17 @@ async def get_ai_analysis_settings():
         settings = get_settings()
         ai_settings = settings.get('ai_analysis', {})
         
-        # Check if API key is configured
+        # Check if API key is configured (support both openrouter and legacy openai)
         secrets = get_secrets()
-        openai_secrets = secrets.get('openai', {})
+        openrouter_secrets = secrets.get('openrouter', secrets.get('openai', {}))
         
         result = {
             'enabled': ai_settings.get('enabled', False),
             'daily_schedule_time': ai_settings.get('daily_schedule_time', '12:00'),
             'send_to_telegram': ai_settings.get('send_to_telegram', True),
             'send_to_external_server': ai_settings.get('send_to_external_server', True),
-            'has_api_key': bool(openai_secrets.get('api_key')),
-            'model': openai_secrets.get('model', 'gpt-4o')
+            'has_api_key': bool(openrouter_secrets.get('api_key')),
+            'model': openrouter_secrets.get('model', 'anthropic/claude-3.5-sonnet')
         }
         
         return {"success": True, "data": result}
@@ -269,20 +269,30 @@ async def update_ai_analysis_settings(settings: AIAnalysisSettings):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/openai")
-async def update_openai_secrets(secrets_data: OpenAISecrets):
-    """Update OpenAI API secrets."""
+@router.put("/openrouter")
+async def update_openrouter_secrets(secrets_data: OpenRouterSecrets):
+    """Update OpenRouter API secrets."""
     try:
         current = get_secrets()
-        current['openai'] = {
-            'api_key': secrets_data.api_key if secrets_data.api_key else current.get('openai', {}).get('api_key', ''),
+        current['openrouter'] = {
+            'api_key': secrets_data.api_key if secrets_data.api_key else current.get('openrouter', current.get('openai', {})).get('api_key', ''),
             'model': secrets_data.model
         }
+        # Remove legacy openai key if exists
+        if 'openai' in current:
+            del current['openai']
         save_secrets(current)
         reload_config()
-        return {"success": True, "message": "OpenAI settings updated"}
+        return {"success": True, "message": "OpenRouter settings updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/openrouter/models")
+async def get_openrouter_models():
+    """Get available OpenRouter vision models."""
+    from backend.analysis.ai_analyzer import OPENROUTER_VISION_MODELS
+    return {"success": True, "data": OPENROUTER_VISION_MODELS}
 
 
 @router.get("/telegram")

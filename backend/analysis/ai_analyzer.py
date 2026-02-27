@@ -1,6 +1,7 @@
-"""AI Photo Analysis Module using OpenAI Vision API.
+"""AI Photo Analysis Module using OpenRouter API.
 
-Provides automated plant health analysis using GPT-4 Vision.
+Provides automated plant health analysis using various vision models via OpenRouter.
+OpenRouter provides access to multiple AI models including GPT-4, Claude, and more.
 """
 import logging
 import base64
@@ -12,6 +13,20 @@ from typing import Optional, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
+# OpenRouter configuration
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# Popular vision models available on OpenRouter
+OPENROUTER_VISION_MODELS = {
+    "anthropic/claude-3.5-sonnet": "Claude 3.5 Sonnet (recommended)",
+    "anthropic/claude-3-opus": "Claude 3 Opus",
+    "anthropic/claude-3-haiku": "Claude 3 Haiku (fast)",
+    "openai/gpt-4o": "GPT-4o",
+    "openai/gpt-4-vision-preview": "GPT-4 Vision",
+    "google/gemini-pro-vision": "Gemini Pro Vision",
+    "meta-llama/llama-3.2-90b-vision-instruct": "Llama 3.2 90B Vision",
+}
+
 
 class AIAnalysisError(Exception):
     """Custom exception for AI analysis errors."""
@@ -19,7 +34,7 @@ class AIAnalysisError(Exception):
 
 
 class AIAnalyzer:
-    """Handles AI-powered plant photo analysis using OpenAI Vision API."""
+    """Handles AI-powered plant photo analysis using OpenRouter API."""
     
     def __init__(self, config: Dict[str, Any], secrets: Dict[str, Any]):
         """Initialize the AI analyzer.
@@ -29,11 +44,19 @@ class AIAnalyzer:
             secrets: Secrets configuration dictionary
         """
         self.config = config.get('ai_analysis', {})
-        self.secrets = secrets.get('openai', {})
+        self.secrets = secrets.get('openrouter', {})
+        
+        # Support legacy openai config for backwards compatibility
+        if not self.secrets:
+            self.secrets = secrets.get('openai', {})
         
         self.api_key = self.secrets.get('api_key', '')
-        self.model = self.secrets.get('model', 'gpt-4o')
+        self.model = self.secrets.get('model', 'anthropic/claude-3.5-sonnet')
         self.enabled = bool(self.api_key) and self.config.get('enabled', False)
+        
+        # Site info for OpenRouter headers
+        self.site_url = self.config.get('site_url', 'https://grow-tent-automation.local')
+        self.site_name = self.config.get('site_name', 'Grow Tent Automation')
         
         self.default_prompt = self.config.get('analysis_prompt', '''
 Analyze this cannabis/plant photo. Assess:
@@ -49,7 +72,7 @@ Provide a structured response with these sections.
         self.send_to_telegram = self.config.get('send_to_telegram', True)
         self.send_to_external = self.config.get('send_to_external_server', True)
         
-        logger.info(f"AI Analyzer initialized. Enabled: {self.enabled}")
+        logger.info(f"AI Analyzer initialized (OpenRouter). Enabled: {self.enabled}, Model: {self.model}")
     
     def _encode_image(self, image_path: str) -> str:
         """Encode image to base64.
@@ -91,7 +114,7 @@ Provide a structured response with these sections.
         """Extract health score from analysis text.
         
         Args:
-            analysis_text: The analysis text from OpenAI
+            analysis_text: The analysis text from AI
             
         Returns:
             Health score (1-10) or None if not found
@@ -117,7 +140,7 @@ Provide a structured response with these sections.
         """Extract recommendations section from analysis text.
         
         Args:
-            analysis_text: The analysis text from OpenAI
+            analysis_text: The analysis text from AI
             
         Returns:
             Recommendations text
@@ -137,7 +160,7 @@ Provide a structured response with these sections.
     
     def analyze_photo(self, image_path: str, 
                       custom_prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Analyze a plant photo using OpenAI Vision API.
+        """Analyze a plant photo using OpenRouter API.
         
         Args:
             image_path: Path to the image file
@@ -150,13 +173,21 @@ Provide a structured response with these sections.
             raise AIAnalysisError("AI analysis is not enabled or API key not configured")
         
         if not self.api_key:
-            raise AIAnalysisError("OpenAI API key not configured")
+            raise AIAnalysisError("OpenRouter API key not configured")
         
         try:
             # Import openai here to avoid import errors if not installed
             import openai
             
-            client = openai.OpenAI(api_key=self.api_key)
+            # Configure OpenRouter client
+            client = openai.OpenAI(
+                api_key=self.api_key,
+                base_url=OPENROUTER_BASE_URL,
+                default_headers={
+                    "HTTP-Referer": self.site_url,
+                    "X-Title": self.site_name
+                }
+            )
             
             # Encode image
             base64_image = self._encode_image(image_path)
@@ -166,7 +197,7 @@ Provide a structured response with these sections.
             prompt = custom_prompt or self.default_prompt
             
             # Make API request
-            logger.info(f"Sending image for analysis: {image_path}")
+            logger.info(f"Sending image for analysis via OpenRouter: {image_path} (model: {self.model})")
             
             response = client.chat.completions.create(
                 model=self.model,
@@ -210,12 +241,12 @@ Provide a structured response with these sections.
             return result
             
         except openai.APIError as e:
-            error_msg = f"OpenAI API error: {str(e)}"
+            error_msg = f"OpenRouter API error: {str(e)}"
             logger.error(error_msg)
             raise AIAnalysisError(error_msg)
             
         except openai.RateLimitError:
-            error_msg = "OpenAI rate limit exceeded. Please try again later."
+            error_msg = "OpenRouter rate limit exceeded. Please try again later."
             logger.error(error_msg)
             raise AIAnalysisError(error_msg)
             
@@ -244,6 +275,7 @@ Provide a structured response with these sections.
             message += f"📁 Project: {project_name}\n"
         
         message += f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        message += f"🤖 Model: {analysis.get('model', 'N/A')}\n"
         
         if health_score:
             message += f"{score_emoji} Health Score: {health_score}/10\n\n"
@@ -311,6 +343,14 @@ Provide a structured response with these sections.
             report += "---\n\n"
         
         return report
+    
+    def get_available_models(self) -> Dict[str, str]:
+        """Get dictionary of available vision models.
+        
+        Returns:
+            Dictionary of model_id: display_name
+        """
+        return OPENROUTER_VISION_MODELS.copy()
 
 
 # Singleton instance

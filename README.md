@@ -14,19 +14,22 @@ A production-ready Raspberry Pi grow tent automation system with comprehensive m
 
 ### Advanced Features
 - **Project Management**: Organize grows by project with start/end dates and status tracking
-- **Project-Integrated Time-lapse**: Automatic capture per project, resumes after power cuts
+- **Smart Time-lapse**: Automatic capture per project, only when lights are ON (saves storage)
 - **Grow Diary**: Document your grow with text entries and photos
-- **AI Photo Analysis**: Daily OpenAI Vision-powered plant health analysis
+- **AI Photo Analysis**: Multi-model plant health analysis via OpenRouter API
 - **External Server Sync**: Mirror data to your own server for backup/blogging
 - **Background Task Scheduler**: APScheduler-based scheduled tasks
-- **Live Camera Feed**: Real-time view of your grow tent
+- **Live Camera Feed**: Real-time view of your grow tent (supports imx477 HQ Camera)
 
-### Version 2.0 Enhancements
+### Version 2.1 Enhancements (Python 3.13 Compatible)
+- **OpenRouter Integration**: Access to multiple AI models (Claude, GPT-4, Gemini) for plant analysis
+- **Smart Time-lapse**: Only captures when lights are ON, reducing storage waste
+- **Enhanced Settings UI**: Visual sliders, toggle switches, and time pickers
+- **Project Creation Wizard**: Time-lapse configuration on project creation
 - **YAML Configuration**: Easy-to-edit `settings.yaml` and `secrets.yaml` files
-- **Web-Based Settings**: Configure everything through the UI (no JSON editing)
+- **Web-Based Settings**: Configure everything through the UI (no file editing needed)
 - **Service Stability**: Auto-restart, watchdog, improved error handling
 - **Rotating Logs**: Log rotation to prevent disk space issues
-- **Health Endpoints**: Comprehensive `/api/health` for monitoring
 
 ## 📋 Hardware Requirements
 
@@ -184,15 +187,27 @@ The system can sync data to your own server for:
 
 See [API.md](API.md) for the API specification your server should implement.
 
-## 🤖 AI Plant Analysis
+## 🤖 AI Plant Analysis (via OpenRouter)
 
-The system uses OpenAI's GPT-4 Vision to analyze plant photos daily:
+The system uses OpenRouter to access multiple AI vision models for plant health analysis:
+- **Claude 3.5 Sonnet** (recommended) - Excellent detail and accuracy
+- **Claude 3 Opus** - Most capable, higher cost
+- **GPT-4o** - OpenAI's latest vision model
+- **Gemini Pro Vision** - Google's vision model
+- And more...
+
+### What it analyzes:
 - Health score (1-10)
-- Growth stage assessment
+- Growth stage assessment (seedling, vegetative, flowering)
 - Issue detection (deficiencies, pests, diseases)
-- Recommendations
+- Color and appearance assessment
+- Actionable recommendations
 
-Configure your OpenAI API key in `config/secrets.yaml` and enable in settings.
+### Setup:
+1. Get an API key from [OpenRouter](https://openrouter.ai/)
+2. Add the key in System Settings → AI Analysis → OpenRouter API Key
+3. Select your preferred vision model
+4. Enable daily analysis and set the schedule time
 
 ## 📱 Telegram Commands
 

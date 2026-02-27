@@ -60,6 +60,14 @@ timelapse:
   auto_start_on_project: true    # Auto-start timelapse when project created
 ```
 
+**Smart Time-lapse:**
+When creating a new project, you can enable "Smart Mode" which only captures images when the lights are ON. This saves storage space by skipping captures during dark periods.
+
+**UI Features:**
+- Visual interval slider (1 minute to 1 hour)
+- Toggle switches for enabling/disabling features
+- Time picker for scheduling
+
 ### Alert Thresholds
 ```yaml
 alerts:
@@ -135,12 +143,21 @@ To get your Telegram credentials:
 1. Message @BotFather to create a bot and get the token
 2. Message @userinfobot to get your chat ID
 
-### OpenAI API
+### OpenRouter API (for AI Plant Analysis)
 ```yaml
-openai:
-  api_key: "YOUR_API_KEY"        # Get from platform.openai.com
-  model: "gpt-4o"                # Vision-capable model
+openrouter:
+  api_key: "YOUR_API_KEY"                    # Get from openrouter.ai
+  model: "anthropic/claude-3.5-sonnet"       # Vision-capable model
 ```
+
+**Available Vision Models:**
+- `anthropic/claude-3.5-sonnet` - Recommended, excellent accuracy
+- `anthropic/claude-3-opus` - Most capable, higher cost
+- `anthropic/claude-3-haiku` - Fast and affordable
+- `openai/gpt-4o` - OpenAI's latest vision model
+- `openai/gpt-4-vision-preview` - GPT-4 Vision
+- `google/gemini-pro-vision` - Google's vision model
+- `meta-llama/llama-3.2-90b-vision-instruct` - Llama 3.2 Vision
 
 ### External Server
 ```yaml
@@ -158,12 +175,48 @@ external_server:
 
 ## Web-Based Configuration
 
-You can also configure most settings through the Web UI:
+You can configure most settings through the enhanced Web UI:
 
-1. Navigate to **Settings** in the sidebar
-2. Go to **System Settings** tab
-3. Edit settings in the user-friendly forms
+### System Settings Page
+1. Navigate to **System Settings** in the sidebar
+2. Use the tabbed interface for different setting categories
+3. Edit settings using the visual controls
 4. Click **Save** to apply changes
+
+### Enhanced UI Controls
+
+The settings page features modern, visual controls:
+
+**Toggle Switches:**
+- Enable/disable features with a single click
+- Visual feedback for on/off states
+- Used for: Alerts, Time-lapse, Telegram notifications, etc.
+
+**Slider Controls:**
+- Temperature range: Slide to set min/max thresholds
+- Humidity range: Slide to set min/max thresholds
+- Time-lapse interval: Visual slider from 1 min to 1 hour
+- Shows current value with colored indicators
+
+**Time Pickers:**
+- Native HTML5 time input for schedule settings
+- 24-hour format for daily analysis time
+- Easy selection with hour/minute controls
+
+**Model Selector:**
+- Dropdown menu for AI vision models
+- Shows model name and description
+- Updates dynamically from OpenRouter
+
+### Project Creation Wizard
+
+When creating a new project:
+1. Enter project name and notes
+2. **Time-lapse Options:**
+   - Toggle to enable/disable time-lapse
+   - Interval selector (5, 10, 15, 30 min, 1 hour)
+   - Smart mode toggle (only capture when lights ON)
+3. Click Create to start your grow
 
 ---
 

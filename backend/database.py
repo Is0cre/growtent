@@ -68,6 +68,10 @@ class Database:
                 cursor.execute("ALTER TABLE projects ADD COLUMN timelapse_last_capture TIMESTAMP")
             except sqlite3.OperationalError:
                 pass
+            try:
+                cursor.execute("ALTER TABLE projects ADD COLUMN timelapse_only_with_lights INTEGER DEFAULT 1")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             
             # Sensor logs table
             cursor.execute("""
@@ -229,16 +233,18 @@ class Database:
     # Project methods
     def create_project(self, name: str, notes: str = "", 
                       timelapse_enabled: bool = True,
-                      timelapse_interval: int = 300) -> int:
+                      timelapse_interval: int = 300,
+                      timelapse_only_with_lights: bool = True) -> int:
         """Create a new project."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO projects (name, start_date, notes, status, 
-                                     timelapse_enabled, timelapse_interval)
-                VALUES (?, ?, ?, 'active', ?, ?)
+                                     timelapse_enabled, timelapse_interval, timelapse_only_with_lights)
+                VALUES (?, ?, ?, 'active', ?, ?, ?)
             """, (name, datetime.now(), notes, 
-                  1 if timelapse_enabled else 0, timelapse_interval))
+                  1 if timelapse_enabled else 0, timelapse_interval,
+                  1 if timelapse_only_with_lights else 0))
             conn.commit()
             return cursor.lastrowid
     
@@ -274,7 +280,7 @@ class Database:
             cursor = conn.cursor()
             allowed_fields = ['name', 'notes', 'status', 'end_date',
                             'timelapse_enabled', 'timelapse_interval',
-                            'timelapse_last_capture']
+                            'timelapse_last_capture', 'timelapse_only_with_lights']
             updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
             
             if not updates:

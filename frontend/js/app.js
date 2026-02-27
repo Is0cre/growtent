@@ -147,3 +147,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 2000);
 });
+
+
+
+// Helper function to adjust numeric input values (for +/- spinners)
+function adjustValue(inputId, delta) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        const min = parseInt(input.min) || -Infinity;
+        const max = parseInt(input.max) || Infinity;
+        const newValue = Math.min(max, Math.max(min, parseInt(input.value || 0) + delta));
+        input.value = newValue;
+    }
+}

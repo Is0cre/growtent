@@ -56,6 +56,9 @@ class AutomationEngine:
         # Track timelapse per project
         self.project_timelapse_timers: Dict[int, datetime] = {}
         
+        # Track timelapse status per project (for UI)
+        self.project_timelapse_status: Dict[int, str] = {}
+        
         # Alert state tracking (to avoid spam)
         self.active_alerts: Dict[str, datetime] = {}
         
@@ -362,6 +365,7 @@ class AutomationEngine:
             for project in projects:
                 project_id = project['id']
                 interval = project.get('timelapse_interval', 300)
+                smart_timelapse = project.get('timelapse_only_with_lights', True)
                 
                 # Get last capture time from our tracker or database
                 last_capture = self.project_timelapse_timers.get(project_id)
@@ -390,11 +394,40 @@ class AutomationEngine:
                 if elapsed < interval:
                     continue
                 
+                # Smart time-lapse: Check if lights are ON before capturing
+                if smart_timelapse:
+                    lights_on = self._are_lights_on()
+                    if not lights_on:
+                        self.project_timelapse_status[project_id] = "Waiting for lights"
+                        logger.debug(f"Skipping timelapse for project {project_id}: lights are OFF")
+                        continue
+                
                 # Capture image for this project
+                self.project_timelapse_status[project_id] = "Capturing"
                 self._capture_project_timelapse(project_id, project.get('name', 'Unknown'))
+                self.project_timelapse_status[project_id] = "Active"
                 
         except Exception as e:
             logger.error(f"Error checking project timelapse capture: {e}")
+    
+    def _are_lights_on(self) -> bool:
+        """Check if the lights device is currently ON.
+        
+        Returns:
+            True if lights are ON, False otherwise
+        """
+        if not self.relay:
+            # If no relay controller, assume lights are on
+            return True
+        
+        try:
+            # Check the lights device state
+            lights_state = self.relay.get_state('lights')
+            return lights_state
+        except Exception as e:
+            logger.warning(f"Could not check lights state: {e}")
+            # Default to allowing capture if we can't check
+            return True
     
     def _capture_project_timelapse(self, project_id: int, project_name: str):
         """Capture a timelapse image for a specific project."""
@@ -435,7 +468,36 @@ class AutomationEngine:
         """Stop timelapse capture for a project."""
         if project_id in self.project_timelapse_timers:
             del self.project_timelapse_timers[project_id]
+        if project_id in self.project_timelapse_status:
+            del self.project_timelapse_status[project_id]
         logger.info(f"Stopped timelapse for project {project_id}")
+    
+    def get_timelapse_status(self, project_id: int = None) -> Dict[str, Any]:
+        """Get timelapse status for a project or all projects.
+        
+        Args:
+            project_id: Optional project ID. If None, returns status for all projects.
+            
+        Returns:
+            Dictionary with timelapse status information
+        """
+        if project_id is not None:
+            return {
+                'project_id': project_id,
+                'status': self.project_timelapse_status.get(project_id, 'Unknown'),
+                'last_capture': self.project_timelapse_timers.get(project_id),
+                'lights_on': self._are_lights_on()
+            }
+        
+        # Return all project statuses
+        return {
+            pid: {
+                'status': status,
+                'last_capture': self.project_timelapse_timers.get(pid),
+                'lights_on': self._are_lights_on()
+            }
+            for pid, status in self.project_timelapse_status.items()
+        }
     
     # Manual control methods
     

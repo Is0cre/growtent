@@ -1,41 +1,43 @@
-# Grow Tent Automation Requirements
+# Grow Tent Automation Requirements (Python 3.13 compatible)
 
 # Web Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-pydantic==2.5.0
+fastapi>=0.115.0,<0.116.0
+uvicorn[standard]>=0.30.0,<0.31.0
+python-multipart>=0.0.9,<0.1.0
+pydantic>=2.9.0,<3.0.0
 
-# Hardware Control (Raspberry Pi specific)
+# Hardware Control
 RPi.GPIO==0.7.1
 bme680==1.1.1
 smbus2==0.4.3
-picamera2==0.3.16
+picamera2>=0.3.20,<0.4.0
 
 # Telegram Bot
-python-telegram-bot==20.7
+python-telegram-bot>=20.8,<21.0
 
 # Configuration
-pyyaml==6.0.1
+pyyaml>=6.0.1,<7.0.0
 
 # Image Processing
-Pillow==10.1.0
-numpy==1.26.2
+Pillow>=12.0.0,<13.0.0
+numpy>=2.0.0,<2.1.0
 
 # Video Processing
-opencv-python==4.8.1.78
+opencv-python>=4.10.0,<4.11.0
 
-# OpenAI for plant health analysis
-openai==1.3.7
+# OpenAI for plant health analysis (via OpenRouter)
+openai>=1.40.0,<2.0.0
 
-# HTTP Client for external sync
-requests==2.31.0
-urllib3==2.1.0
+# HTTP Client
+requests>=2.32.0,<3.0.0
+urllib3>=2.2.0,<3.0.0
 
 # Background Task Scheduler
-APScheduler==3.10.4
-SQLAlchemy==2.0.23
+APScheduler>=3.10.4,<3.11.0
+
+# ORM / DB
+SQLAlchemy>=2.0.23,<2.1.0
 
 # Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
+pytest>=7.4.3,<8.0.0
+pytest-asyncio>=0.23.0,<0.24.0

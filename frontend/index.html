@@ -426,21 +426,33 @@
                         </div>
                         <div class="card-body">
                             <form id="timelapseSettingsForm" class="settings-form">
-                                <div class="form-group">
-                                    <label for="tlInterval">Default Interval (seconds):</label>
-                                    <input type="number" id="tlInterval" min="30" value="300">
+                                <div class="form-group slider-group">
+                                    <label>Default Capture Interval:</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="tlIntervalSlider" min="60" max="3600" step="60" value="300" class="slider">
+                                        <span class="slider-value" id="tlIntervalDisplay">5 minutes</span>
+                                    </div>
+                                    <div class="slider-labels">
+                                        <span>1 min</span>
+                                        <span>1 hour</span>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="tlFps">Video FPS:</label>
-                                    <input type="number" id="tlFps" min="1" max="60" value="30">
+                                    <div class="number-spinner">
+                                        <button type="button" class="spinner-btn" onclick="adjustValue('tlFps', -5)">−</button>
+                                        <input type="number" id="tlFps" min="1" max="60" value="30">
+                                        <button type="button" class="spinner-btn" onclick="adjustValue('tlFps', 5)">+</button>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label>
+                                <div class="form-group toggle-group">
+                                    <label class="toggle-switch">
                                         <input type="checkbox" id="tlAutoStart" checked>
-                                        Auto-start on new project
+                                        <span class="toggle-slider"></span>
                                     </label>
+                                    <span class="toggle-label">Auto-start time-lapse on new projects</span>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Save</button>
+                                <button type="submit" class="btn btn-primary">Save Settings</button>
                             </form>
                         </div>
                     </div>
@@ -455,37 +467,62 @@
                         </div>
                         <div class="card-body">
                             <form id="alertSettingsForm" class="settings-form">
-                                <div class="form-group">
-                                    <label>
+                                <div class="form-group toggle-group">
+                                    <label class="toggle-switch">
                                         <input type="checkbox" id="alertsEnabled" checked>
-                                        Enable Alerts
+                                        <span class="toggle-slider"></span>
                                     </label>
+                                    <span class="toggle-label">Enable Environmental Alerts</span>
                                 </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="tempMin">Min Temperature (°C):</label>
-                                        <input type="number" id="tempMin" step="0.5" value="15">
+                                
+                                <div class="threshold-section">
+                                    <h4>🌡️ Temperature Range</h4>
+                                    <div class="range-sliders">
+                                        <div class="form-group slider-group">
+                                            <label>Minimum: <span id="tempMinValue" class="value-badge">15</span>°C</label>
+                                            <input type="range" id="tempMinSlider" min="5" max="30" step="0.5" value="15" class="slider slider-temp">
+                                        </div>
+                                        <div class="form-group slider-group">
+                                            <label>Maximum: <span id="tempMaxValue" class="value-badge">32</span>°C</label>
+                                            <input type="range" id="tempMaxSlider" min="20" max="45" step="0.5" value="32" class="slider slider-temp">
+                                        </div>
                                     </div>
-                                    <div class="form-group">
-                                        <label for="tempMax">Max Temperature (°C):</label>
-                                        <input type="number" id="tempMax" step="0.5" value="32">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="humidityMin">Min Humidity (%):</label>
-                                        <input type="number" id="humidityMin" step="1" value="40">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="humidityMax">Max Humidity (%):</label>
-                                        <input type="number" id="humidityMax" step="1" value="80">
+                                    <div class="slider-labels">
+                                        <span>Cold</span>
+                                        <span>Hot</span>
                                     </div>
                                 </div>
+                                
+                                <div class="threshold-section">
+                                    <h4>💧 Humidity Range</h4>
+                                    <div class="range-sliders">
+                                        <div class="form-group slider-group">
+                                            <label>Minimum: <span id="humidityMinValue" class="value-badge">40</span>%</label>
+                                            <input type="range" id="humidityMinSlider" min="10" max="70" step="1" value="40" class="slider slider-humidity">
+                                        </div>
+                                        <div class="form-group slider-group">
+                                            <label>Maximum: <span id="humidityMaxValue" class="value-badge">80</span>%</label>
+                                            <input type="range" id="humidityMaxSlider" min="50" max="100" step="1" value="80" class="slider slider-humidity">
+                                        </div>
+                                    </div>
+                                    <div class="slider-labels">
+                                        <span>Dry</span>
+                                        <span>Humid</span>
+                                    </div>
+                                </div>
+                                
                                 <div class="form-group">
-                                    <label for="notificationInterval">Notification Interval (seconds):</label>
-                                    <input type="number" id="notificationInterval" min="60" value="300">
+                                    <label for="notificationInterval">Alert Cooldown (seconds):</label>
+                                    <select id="notificationInterval">
+                                        <option value="60">1 minute</option>
+                                        <option value="300" selected>5 minutes</option>
+                                        <option value="600">10 minutes</option>
+                                        <option value="1800">30 minutes</option>
+                                        <option value="3600">1 hour</option>
+                                    </select>
+                                    <small>Minimum time between repeated alerts</small>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Save</button>
+                                <button type="submit" class="btn btn-primary">Save Alert Settings</button>
                             </form>
                         </div>
                     </div>
@@ -500,44 +537,58 @@
                         </div>
                         <div class="card-body">
                             <form id="aiSettingsForm" class="settings-form">
-                                <div class="form-group">
-                                    <label>
+                                <div class="form-group toggle-group">
+                                    <label class="toggle-switch">
                                         <input type="checkbox" id="aiEnabled">
-                                        Enable Daily AI Analysis
+                                        <span class="toggle-slider"></span>
                                     </label>
+                                    <span class="toggle-label">Enable Daily AI Analysis</span>
                                 </div>
                                 <div class="form-group">
                                     <label for="aiScheduleTime">Daily Analysis Time:</label>
-                                    <input type="time" id="aiScheduleTime" value="12:00">
+                                    <input type="time" id="aiScheduleTime" value="12:00" class="time-picker">
+                                    <small>When to run automated plant health analysis</small>
                                 </div>
-                                <div class="form-group">
-                                    <label>
+                                <div class="form-group toggle-group">
+                                    <label class="toggle-switch">
                                         <input type="checkbox" id="aiSendTelegram" checked>
-                                        Send to Telegram
+                                        <span class="toggle-slider"></span>
                                     </label>
+                                    <span class="toggle-label">Send results to Telegram</span>
                                 </div>
-                                <div class="form-group">
-                                    <label>
+                                <div class="form-group toggle-group">
+                                    <label class="toggle-switch">
                                         <input type="checkbox" id="aiSendExternal" checked>
-                                        Sync to External Server
+                                        <span class="toggle-slider"></span>
                                     </label>
+                                    <span class="toggle-label">Sync to External Server</span>
                                 </div>
                                 <button type="submit" class="btn btn-primary">Save Settings</button>
                             </form>
                             <hr>
-                            <h4>OpenAI API Configuration</h4>
-                            <form id="openaiSettingsForm" class="settings-form">
+                            <h4>🤖 OpenRouter API Configuration</h4>
+                            <p class="info-text">
+                                OpenRouter provides access to multiple AI models for plant analysis.
+                                <a href="https://openrouter.ai/" target="_blank">Get your API key →</a>
+                            </p>
+                            <div id="apiKeyStatus" class="api-status"></div>
+                            <form id="openrouterSettingsForm" class="settings-form">
                                 <div class="form-group">
-                                    <label for="openaiApiKey">API Key:</label>
-                                    <input type="password" id="openaiApiKey" placeholder="sk-...">
+                                    <label for="openrouterApiKey">OpenRouter API Key:</label>
+                                    <input type="password" id="openrouterApiKey" placeholder="sk-or-v1-...">
                                     <small>Leave blank to keep existing key</small>
                                 </div>
                                 <div class="form-group">
-                                    <label for="openaiModel">Model:</label>
-                                    <select id="openaiModel">
-                                        <option value="gpt-4o">GPT-4o (recommended)</option>
-                                        <option value="gpt-4-vision-preview">GPT-4 Vision</option>
+                                    <label for="openrouterModel">Vision Model:</label>
+                                    <select id="openrouterModel">
+                                        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (recommended)</option>
+                                        <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
+                                        <option value="anthropic/claude-3-haiku">Claude 3 Haiku (fast)</option>
+                                        <option value="openai/gpt-4o">GPT-4o</option>
+                                        <option value="openai/gpt-4-vision-preview">GPT-4 Vision</option>
+                                        <option value="google/gemini-pro-vision">Gemini Pro Vision</option>
                                     </select>
+                                    <small>Select the AI model for plant health analysis</small>
                                 </div>
                                 <button type="submit" class="btn btn-primary">Save API Settings</button>
                             </form>
@@ -646,6 +697,11 @@
                             <h3>Telegram Configuration</h3>
                         </div>
                         <div class="card-body">
+                            <p class="info-text">
+                                Connect to Telegram to receive alerts and analysis results.
+                                Create a bot via <a href="https://t.me/BotFather" target="_blank">@BotFather</a>
+                            </p>
+                            <div id="tokenStatus" class="api-status"></div>
                             <form id="telegramSettingsForm" class="settings-form">
                                 <div class="form-group">
                                     <label for="telegramBotToken">Bot Token:</label>
@@ -655,6 +711,7 @@
                                 <div class="form-group">
                                     <label for="telegramChatId">Chat ID:</label>
                                     <input type="text" id="telegramChatId" placeholder="632820309">
+                                    <small>Get your chat ID from <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a></small>
                                 </div>
                                 <button type="submit" class="btn btn-primary">Save Telegram Settings</button>
                             </form>

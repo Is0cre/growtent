@@ -20,6 +20,7 @@ class ProjectCreate(BaseModel):
     notes: Optional[str] = ""
     timelapse_enabled: Optional[bool] = True
     timelapse_interval: Optional[int] = 300
+    timelapse_only_with_lights: Optional[bool] = True
 
 
 class ProjectUpdate(BaseModel):
@@ -28,6 +29,7 @@ class ProjectUpdate(BaseModel):
     status: Optional[str] = None
     timelapse_enabled: Optional[bool] = None
     timelapse_interval: Optional[int] = None
+    timelapse_only_with_lights: Optional[bool] = None
 
 
 @router.get("/")
@@ -94,13 +96,15 @@ async def create_project(project: ProjectCreate):
         # Determine timelapse settings
         timelapse_enabled = project.timelapse_enabled if project.timelapse_enabled is not None else TIMELAPSE_AUTO_START
         timelapse_interval = project.timelapse_interval or TIMELAPSE_INTERVAL
+        timelapse_only_with_lights = project.timelapse_only_with_lights if project.timelapse_only_with_lights is not None else True
         
         # Create project with timelapse settings
         project_id = db.create_project(
             project.name, 
             project.notes,
             timelapse_enabled=timelapse_enabled,
-            timelapse_interval=timelapse_interval
+            timelapse_interval=timelapse_interval,
+            timelapse_only_with_lights=timelapse_only_with_lights
         )
         
         # Create project-specific directories
@@ -109,10 +113,13 @@ async def create_project(project: ProjectCreate):
         new_project = db.get_project(project_id)
         new_project['timelapse_count'] = 0
         new_project['timelapse_enabled'] = timelapse_enabled
+        new_project['timelapse_only_with_lights'] = timelapse_only_with_lights
         
         message = "Project created"
         if timelapse_enabled:
             message += " with time-lapse capture enabled"
+            if timelapse_only_with_lights:
+                message += " (smart mode: only when lights ON)"
         
         return {"success": True, "data": new_project, "message": message}
     except Exception as e:
@@ -125,9 +132,11 @@ async def update_project(project_id: int, project: ProjectUpdate):
     try:
         updates = {k: v for k, v in project.dict().items() if v is not None}
         
-        # Convert timelapse_enabled to int for database
+        # Convert boolean fields to int for database
         if 'timelapse_enabled' in updates:
             updates['timelapse_enabled'] = 1 if updates['timelapse_enabled'] else 0
+        if 'timelapse_only_with_lights' in updates:
+            updates['timelapse_only_with_lights'] = 1 if updates['timelapse_only_with_lights'] else 0
         
         success = db.update_project(project_id, **updates)
         
@@ -137,6 +146,7 @@ async def update_project(project_id: int, project: ProjectUpdate):
         updated_project = db.get_project(project_id)
         updated_project['timelapse_count'] = db.get_timelapse_image_count(project_id)
         updated_project['timelapse_enabled'] = bool(updated_project.get('timelapse_enabled', 1))
+        updated_project['timelapse_only_with_lights'] = bool(updated_project.get('timelapse_only_with_lights', 1))
         
         return {"success": True, "data": updated_project, "message": "Project updated"}
     except HTTPException:
