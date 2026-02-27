@@ -1,2 +1,0 @@
-RPi.GPIO>=0.7
-adafruit-circuitpython-bme680>=3.7
